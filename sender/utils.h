@@ -79,7 +79,7 @@ typedef struct
 #define STRING_SIZE 255
 #define MTU 1400        // some room for lower layers
 #define HEADER_SIZE sizeof(dns_header)
-#define DEFAULT_IPV4 134774072  // IPv4 for google.com - 8.8.8.8
+#define DEFAULT_IPV4 134744072  // IPv4 for google.com - 8.8.8.8
 #define DEFAULT_IPV6 {8193, 18528, 18528, 0, 0, 0, 0, 25700}// IPv6 for google.com - 2001:4860:4860::6464
 typedef struct
 {

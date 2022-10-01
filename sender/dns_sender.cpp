@@ -140,7 +140,7 @@ void sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struc
     unsigned char buffer[MTU] = {'\0'};
 
     // dest->sin_addr.s_addr = {data->ipv4}; // fits ipv4 to struct in_addr
-    dest->sin_addr.s_addr = inet_addr("192.168.137.179");
+    dest->sin_addr.s_addr = {data->ipv4};
     dest->sin_family = AF_INET;
     dest->sin_port = htons(PORT); // set the server port (network byte order)
 
