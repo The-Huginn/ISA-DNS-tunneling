@@ -204,8 +204,7 @@ void sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struc
     }
 }
 
-void init_header(dns_header *dns)
-{
+void init_header(dns_header *dns) {
     dns->id = (unsigned short)htons(getpid());
 
     dns->qr = 0;
