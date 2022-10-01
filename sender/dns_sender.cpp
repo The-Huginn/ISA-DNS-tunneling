@@ -139,7 +139,8 @@ void sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struc
 {
     unsigned char buffer[MTU] = {'\0'};
 
-    dest->sin_addr.s_addr = {data->ipv4}; // fits ipv4 to struct in_addr
+    // dest->sin_addr.s_addr = {data->ipv4}; // fits ipv4 to struct in_addr
+    dest->sin_addr.s_addr = inet_addr("192.168.137.179");
     dest->sin_family = AF_INET;
     dest->sin_port = htons(PORT); // set the server port (network byte order)
 
@@ -198,8 +199,7 @@ void sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struc
     // check the length of input message
     // send UDP with either info for opening a TCP connection for multiple packets
     // or sending UDP packet with payload
-    if (sendto(fd, (char *)packet, length, 0, (const sockaddr *)dest, sizeof(sockaddr_in)) < 0)
-    {
+    if (sendto(fd, (char *)packet, length, 0, (const sockaddr *)dest, sizeof(sockaddr_in)) < 0) {
         perror("sendto failed");
     }
 }
@@ -235,7 +235,7 @@ void ChangetoDnsNameFormat(unsigned char *dns, data_cache *data)
     {
         if (data->host[i] == '.')
         {
-            *dns++ = i - lock;
+            *dns++ = i - lock + '0';
             for (; lock < i; lock++)
             {
                 *dns++ = data->host[lock];
