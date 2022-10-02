@@ -38,6 +38,13 @@ typedef struct
     unsigned short qclass;
 } question;
  
+//Structure of a Query
+typedef struct
+{
+    unsigned char *name;
+    question *ques;
+} query;
+
 //Constant sized fields of the resource record structure
 #pragma pack(push, 1)
 typedef struct
@@ -56,13 +63,6 @@ typedef struct
     r_data *resource;
     unsigned char *rdata;
 } res_record;
- 
-//Structure of a Query
-typedef struct
-{
-    unsigned char *name;
-    question *ques;
-} query;
 
 #define T_A 1       // IPv4
 #define T_NS 2      // Nameserver

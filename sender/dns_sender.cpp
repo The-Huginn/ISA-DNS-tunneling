@@ -78,9 +78,6 @@ int read_options(int argc, char **argv, data_cache *data)
     return true;
 }
 
-/*
- *
- * */
 u_char *ReadName(unsigned char *reader, unsigned char *buffer, int *count)
 {
     unsigned char *name;
@@ -135,90 +132,9 @@ u_char *ReadName(unsigned char *reader, unsigned char *buffer, int *count)
     return name;
 }
 
-void sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct sockaddr_in *dest)
+void initHeader(dns_header *dns)
 {
-    unsigned char buffer[MTU] = {'\0'};
-
-    // dest->sin_addr.s_addr = {data->ipv4}; // fits ipv4 to struct in_addr
-    dest->sin_addr.s_addr = {data->ipv4};
-    dest->sin_family = AF_INET;
-    dest->sin_port = htons(PORT); // set the server port (network byte order)
-
-    // resolvec DNS tunnel receiver if needed by default server
-    if (data->ipv4 == DEFAULT_IPV4)
-    {
-        if (sendto(fd, (char *)packet, length, 0, (const sockaddr *)dest, sizeof(sockaddr_in)) < 0)
-        {
-            perror("sendto failed");
-        }
-        int i = sizeof(dest);
-        if (recvfrom(fd, (char *)buffer, MTU, 0, (struct sockaddr *)dest, (socklen_t *)&i) < 0)
-        {
-            perror("recvfrom failed");
-        }
-        for (int i = 0; i < 100; i++)
-            fprintf(stderr, "%c", buffer[i]);
-        dns_header *dns = (dns_header *)buffer;
-        unsigned char *reply = &buffer[length];
-
-        printf("\nThe response contains : ");
-        printf("\n %d Questions.", ntohs(dns->q_count));
-        printf("\n %d Answers.", ntohs(dns->ans_count));
-        printf("\n %d Authoritative Servers.", ntohs(dns->auth_count));
-        printf("\n %d Additional records.\n\n", ntohs(dns->add_count));
-
-        for (i = 0; i < ntohs(dns->ans_count); i++)
-        {
-            int stop = 0;
-            res_record res;
-            res_record *r = &res;
-            r->name = ReadName(reply, buffer, &stop);
-            printf("Name: %s\n", r->name);
-            reply = reply + stop;
-
-            r->resource = (r_data *)(reply);
-            reply = reply + sizeof(r_data);
-
-            if (ntohs(r->resource->type) == T_A) // if its an ipv4 address
-            {
-                r->rdata = (unsigned char *)malloc(ntohs(r->resource->data_len));
-
-                for (int j = 0; j < ntohs(r->resource->data_len); j++)
-                {
-                    r->rdata[j] = reply[j];
-                }
-
-                r->rdata[ntohs(r->resource->data_len)] = '\0';
-
-                reply = reply + ntohs(r->resource->data_len);
-
-                long *p;
-                p = (long *)r->rdata;
-                sockaddr_in a;
-                a.sin_addr.s_addr = (*p); // working without ntohl
-                printf("has IPv4 address : %s", inet_ntoa(a.sin_addr));
-            }
-            else
-            {
-                r->rdata = ReadName(reply, buffer, &stop);
-                reply = reply + stop;
-            }
-        }
-    }
-
-    // check the length of input message
-    // send UDP with either info for opening a TCP connection for multiple packets
-    // or sending UDP packet with payload
-    if (sendto(fd, (char *)packet, length, 0, (const sockaddr *)dest, sizeof(sockaddr_in)) < 0)
-    {
-        perror("sendto failed");
-    }
-}
-
-void init_header(dns_header *dns)
-{
-    // dns->id = (unsigned short)htons(getpid());
-    dns->id = 10;
+    dns->id = (unsigned short)htons(getpid());
 
     dns->qr = 0;
     dns->opcode = 0;
@@ -236,6 +152,150 @@ void init_header(dns_header *dns)
     dns->ans_count = 0;
     dns->auth_count = 0;
     dns->add_count = 0;
+}
+
+int switchToTCP(int fd, const sockaddr *dest, unsigned char *packet, int length)
+{
+    ((dns_header*)packet)->q_count = htons(2);
+
+    if (sendto(fd, (char *)packet, length, 0, (const sockaddr *)dest, sizeof(sockaddr_in)) < 0) {
+        perror("sendto failed");
+        return false;
+    }
+    close(fd);
+
+    // open TCP
+    if ((fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
+        perror("socket() failed\n");
+        return false;
+    }
+
+    if (connect(fd, (struct sockaddr *)dest, sizeof(dest)) == -1) {
+        perror("connect() failed\n");
+    }
+
+    return true;
+}
+
+/**
+ * @brief Tries to resolve tunnel provided by host name
+ */
+int resolveTunnel(int fd, data_cache *data, unsigned char *packet, int length, struct sockaddr_in *dest)
+{
+    unsigned char buffer[MTU] = {'\0'};
+
+    if (sendto(fd, (char *)packet, length, 0, (const sockaddr *)dest, sizeof(sockaddr_in)) < 0)
+    {
+        perror("sendto failed");
+    }
+    int i = sizeof(dest);
+    if (recvfrom(fd, (char *)buffer, MTU, 0, (struct sockaddr *)dest, (socklen_t *)&i) < 0)
+    {
+        perror("recvfrom failed");
+    }
+    dns_header *dns = (dns_header *)buffer;
+    unsigned char *reply = &buffer[length];
+
+    for (i = 0; i < ntohs(dns->ans_count); i++)
+    {
+        int stop = 0;
+        res_record res;
+        res_record *r = &res;
+
+        ReadName(reply, buffer, &stop);
+        reply = reply + stop;
+
+        r->resource = (r_data *)(reply);
+        reply = reply + sizeof(r_data);
+
+        if (ntohs(r->resource->type) == T_A)
+        {
+            r->rdata = (unsigned char *)malloc(ntohs(r->resource->data_len));
+
+            for (int j = 0; j < ntohs(r->resource->data_len); j++)
+            {
+                r->rdata[j] = reply[j];
+            }
+
+            r->rdata[ntohs(r->resource->data_len)] = '\0';
+
+            reply = reply + ntohs(r->resource->data_len);
+
+            long *p;
+            p = (long *)r->rdata;
+            sockaddr_in a;
+            a.sin_addr.s_addr = (*p); // working without ntohl
+            data->ipv4 = a.sin_addr.s_addr;
+        }
+        else
+        {
+            fprintf(stderr, "DNS server provided NS not an IPv4 address : [");
+            r->rdata = ReadName(reply, buffer, &stop);
+            reply = reply + stop;
+            fprintf(stderr, "%s] Try running again with provided NS using -b\n", r->rdata);
+            return false;
+        }
+    }
+    return true;
+}
+
+void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int length) {
+    memcpy(&packet[dns_length], payload, length);
+}
+
+int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct sockaddr_in *dest)
+{
+    unsigned char buffer[MTU] = {'\0'}, payload[MTU] = {'\0'};
+
+    dest->sin_addr.s_addr = {data->ipv4}; // fits ipv4 to struct in_addr
+    dest->sin_family = AF_INET;
+    dest->sin_port = htons(PORT); // set the server port (network byte order)
+
+    // resolves DNS tunnel receiver if needed by default server
+    // changes destination address
+    if (data->ipv4 == DEFAULT_IPV4)
+    {
+        if (!resolveTunnel(fd, data, packet, length, dest))
+            return false;
+    }
+
+    int init = true, max_len = MTU - length, msg_size;
+    while ((msg_size = fread(payload, 1, max_len, data->src_file)) > 0)
+    {
+
+        // send UDP
+        if (init && msg_size < max_len)
+        {
+            appendMessage(packet, length, payload, msg_size);
+            if (sendto(fd, (char *)packet, length + msg_size, 0, (const sockaddr *)dest, sizeof(sockaddr_in)) < 0)
+            {
+                perror("sendto failed");
+                return false;
+            }
+            return true;
+        }
+        else if (init)
+        { // send one UDP to inform about TCP
+            init = false;
+            switchToTCP(fd, (const sockaddr *)dest, packet, length);
+        }
+
+        // TCP communication
+        appendMessage(packet, length, payload, msg_size);
+        int i;
+        if ((i = write(fd, packet, length + msg_size)) == -1)
+        {
+            perror("unable to write()\n");
+            return false;
+        }
+        else if (i != length + msg_size)
+        {
+            perror("unable to write() whole message\n");
+            return false;
+        }
+    }
+
+    return true;
 }
 
 void ChangetoDnsNameFormat(unsigned char *dns, data_cache *data)
@@ -262,293 +322,28 @@ int main(int argc, char *argv[])
 {
     data_cache data;
     unsigned char packet[MTU];
+    int fd;
+    struct sockaddr_in dest;
 
     if (read_options(argc, argv, &data) == false)
         return -1;
 
-    // int c;
-    // while ((c = fgetc(data.src_file)) != EOF) {
-    //     printf("%c", c);
-    // }
-
-    int sock, msg_size, i, fd;
-    struct sockaddr_in dest;
-
     if ((fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
         err(1, "socket() failed\n");
 
-    init_header((dns_header *)packet);
+    initHeader((dns_header *)packet);
     unsigned char *qname = &(packet[HEADER_SIZE]);
     ChangetoDnsNameFormat(qname, &data);
 
     question *qinfo = (question *)&(packet[HEADER_SIZE + strlen((const char *)qname) + 1]); // +1 for \0
-    qinfo->qtype = ntohs(T_A);                                                                     // we want IP address (in case we need to resolve DNS receiver)
+    qinfo->qtype = ntohs(T_A);                                                              // we want IP address (in case we need to resolve DNS receiver)
     qinfo->qclass = htons(IN);
 
     sendIPv4(fd, &data, packet, HEADER_SIZE + strlen((const char *)qname) + 1 + sizeof(question), &dest);
 
+    // closing resources
+    close(fd);
+    fclose(data.src_file);
+
     return 0;
-}
-// List of DNS Servers registered on the system
-char dns_servers[10][100];
-int dns_server_count = 0;
-
-// Function Prototypes
-void ngethostbyname(unsigned char *, int);
-unsigned char *ReadName(unsigned char *, unsigned char *, int *);
-
-// DNS header structure
-struct DNS_HEADER
-{
-    unsigned short id; // identification number
-
-    unsigned char rd : 1;     // recursion desired
-    unsigned char tc : 1;     // truncated message
-    unsigned char aa : 1;     // authoritive answer
-    unsigned char opcode : 4; // purpose of message
-    unsigned char qr : 1;     // query/response flag
-
-    unsigned char rcode : 4; // response code
-    unsigned char cd : 1;    // checking disabled
-    unsigned char ad : 1;    // authenticated data
-    unsigned char z : 1;     // its z! reserved
-    unsigned char ra : 1;    // recursion available
-
-    unsigned short q_count;    // number of question entries
-    unsigned short ans_count;  // number of answer entries
-    unsigned short auth_count; // number of authority entries
-    unsigned short add_count;  // number of resource entries
-};
-
-// Constant sized fields of query structure
-struct QUESTION
-{
-    unsigned short qtype;
-    unsigned short qclass;
-};
-
-// Constant sized fields of the resource record structure
-#pragma pack(push, 1)
-struct R_DATA
-{
-    unsigned short type;
-    unsigned short _class;
-    unsigned int ttl;
-    unsigned short data_len;
-};
-#pragma pack(pop)
-
-// Pointers to resource record contents
-struct RES_RECORD
-{
-    unsigned char *name;
-    struct R_DATA *resource;
-    unsigned char *rdata;
-};
-
-// Structure of a Query
-typedef struct
-{
-    unsigned char *name;
-    struct QUESTION *ques;
-} QUERY;
-
-/*
- * Perform a DNS query by sending a packet
- * */
-void ngethostbyname(unsigned char *host, int query_type)
-{
-    unsigned char buf[65536], *qname, *reader;
-    int i, j, stop, s;
-
-    struct sockaddr_in a;
-
-    struct RES_RECORD answers[20], auth[20], addit[20]; // the replies from the DNS server
-    struct sockaddr_in dest;
-
-    struct DNS_HEADER *dns = NULL;
-    struct QUESTION *qinfo = NULL;
-
-    printf("Resolving %s", host);
-
-    s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); // UDP packet for DNS queries
-
-    dest.sin_family = AF_INET;
-    dest.sin_port = htons(53);
-    dest.sin_addr.s_addr = inet_addr(dns_servers[0]); // dns servers
-
-    // Set the DNS structure to standard queries
-    dns = (struct DNS_HEADER *)&buf;
-
-    dns->id = (unsigned short)htons(getpid());
-    dns->qr = 0;     // This is a query
-    dns->opcode = 0; // This is a standard query
-    dns->aa = 0;     // Not Authoritative
-    dns->tc = 0;     // This message is not truncated
-    dns->rd = 1;     // Recursion Desired
-    dns->ra = 0;     // Recursion not available! hey we dont have it (lol)
-    dns->z = 0;
-    dns->ad = 0;
-    dns->cd = 0;
-    dns->rcode = 0;
-    dns->q_count = htons(1); // we have only 1 question
-    dns->ans_count = 0;
-    dns->auth_count = 0;
-    dns->add_count = 0;
-
-    // point to the query portion
-    qname = (unsigned char *)&buf[sizeof(struct DNS_HEADER)];
-
-    qinfo = (struct QUESTION *)&buf[sizeof(struct DNS_HEADER) + (strlen((const char *)qname) + 1)]; // fill it
-
-    qinfo->qtype = htons(query_type); // type of the query , A , MX , CNAME , NS etc
-    qinfo->qclass = htons(1);         // its internet (lol)
-
-    printf("\nSending Packet...");
-    if (sendto(s, (char *)buf, sizeof(struct DNS_HEADER) + (strlen((const char *)qname) + 1) + sizeof(struct QUESTION), 0, (struct sockaddr *)&dest, sizeof(dest)) < 0)
-    {
-        perror("sendto failed");
-    }
-    printf("Done");
-
-    // Receive the answer
-    i = sizeof dest;
-    printf("\nReceiving answer...");
-    if (recvfrom(s, (char *)buf, 65536, 0, (struct sockaddr *)&dest, (socklen_t *)&i) < 0)
-    {
-        perror("recvfrom failed");
-    }
-    printf("Done");
-
-    dns = (struct DNS_HEADER *)buf;
-
-    // move ahead of the dns header and the query field
-    reader = &buf[sizeof(struct DNS_HEADER) + (strlen((const char *)qname) + 1) + sizeof(struct QUESTION)];
-
-    printf("\nThe response contains : ");
-    printf("\n %d Questions.", ntohs(dns->q_count));
-    printf("\n %d Answers.", ntohs(dns->ans_count));
-    printf("\n %d Authoritative Servers.", ntohs(dns->auth_count));
-    printf("\n %d Additional records.\n\n", ntohs(dns->add_count));
-
-    // Start reading answers
-    stop = 0;
-
-    for (i = 0; i < ntohs(dns->ans_count); i++)
-    {
-        answers[i].name = ReadName(reader, buf, &stop);
-        reader = reader + stop;
-
-        answers[i].resource = (struct R_DATA *)(reader);
-        reader = reader + sizeof(struct R_DATA);
-
-        if (ntohs(answers[i].resource->type) == 1) // if its an ipv4 address
-        {
-            answers[i].rdata = (unsigned char *)malloc(ntohs(answers[i].resource->data_len));
-
-            for (j = 0; j < ntohs(answers[i].resource->data_len); j++)
-            {
-                answers[i].rdata[j] = reader[j];
-            }
-
-            answers[i].rdata[ntohs(answers[i].resource->data_len)] = '\0';
-
-            reader = reader + ntohs(answers[i].resource->data_len);
-        }
-        else
-        {
-            answers[i].rdata = ReadName(reader, buf, &stop);
-            reader = reader + stop;
-        }
-    }
-
-    // read authorities
-    for (i = 0; i < ntohs(dns->auth_count); i++)
-    {
-        auth[i].name = ReadName(reader, buf, &stop);
-        reader += stop;
-
-        auth[i].resource = (struct R_DATA *)(reader);
-        reader += sizeof(struct R_DATA);
-
-        auth[i].rdata = ReadName(reader, buf, &stop);
-        reader += stop;
-    }
-
-    // read additional
-    for (i = 0; i < ntohs(dns->add_count); i++)
-    {
-        addit[i].name = ReadName(reader, buf, &stop);
-        reader += stop;
-
-        addit[i].resource = (struct R_DATA *)(reader);
-        reader += sizeof(struct R_DATA);
-
-        if (ntohs(addit[i].resource->type) == 1)
-        {
-            addit[i].rdata = (unsigned char *)malloc(ntohs(addit[i].resource->data_len));
-            for (j = 0; j < ntohs(addit[i].resource->data_len); j++)
-                addit[i].rdata[j] = reader[j];
-
-            addit[i].rdata[ntohs(addit[i].resource->data_len)] = '\0';
-            reader += ntohs(addit[i].resource->data_len);
-        }
-        else
-        {
-            addit[i].rdata = ReadName(reader, buf, &stop);
-            reader += stop;
-        }
-    }
-
-    // print answers
-    printf("\nAnswer Records : %d \n", ntohs(dns->ans_count));
-    for (i = 0; i < ntohs(dns->ans_count); i++)
-    {
-        printf("Name : %s ", answers[i].name);
-
-        if (ntohs(answers[i].resource->type) == T_A) // IPv4 address
-        {
-            long *p;
-            p = (long *)answers[i].rdata;
-            a.sin_addr.s_addr = (*p); // working without ntohl
-            printf("has IPv4 address : %s", inet_ntoa(a.sin_addr));
-        }
-
-        if (ntohs(answers[i].resource->type) == 5)
-        {
-            // Canonical name for an alias
-            printf("has alias name : %s", answers[i].rdata);
-        }
-
-        printf("\n");
-    }
-
-    // print authorities
-    printf("\nAuthoritive Records : %d \n", ntohs(dns->auth_count));
-    for (i = 0; i < ntohs(dns->auth_count); i++)
-    {
-
-        printf("Name : %s ", auth[i].name);
-        if (ntohs(auth[i].resource->type) == 2)
-        {
-            printf("has nameserver : %s", auth[i].rdata);
-        }
-        printf("\n");
-    }
-
-    // print additional resource records
-    printf("\nAdditional Records : %d \n", ntohs(dns->add_count));
-    for (i = 0; i < ntohs(dns->add_count); i++)
-    {
-        printf("Name : %s ", addit[i].name);
-        if (ntohs(addit[i].resource->type) == 1)
-        {
-            long *p;
-            p = (long *)addit[i].rdata;
-            a.sin_addr.s_addr = (*p);
-            printf("has IPv4 address : %s", inet_ntoa(a.sin_addr));
-        }
-        printf("\n");
-    }
-    return;
 }
