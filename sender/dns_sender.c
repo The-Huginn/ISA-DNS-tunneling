@@ -155,10 +155,10 @@ void initHeader(dns_header *dns)
     dns->add_count = 0;
 }
 
-int switchToTCP(int fd, const sockaddr *dest, unsigned char *packet, int length) {
+int switchToTCP(int fd, const struct sockaddr *dest, unsigned char *packet, int length) {
     ((dns_header *)packet)->q_count = htons(2);
 
-    if (sendto(fd, (char *)packet, length, 0, dest, sizeof(sockaddr_in)) < 0) {
+    if (sendto(fd, (char *)packet, length, 0, dest, sizeof(struct sockaddr_in)) < 0) {
         perror("sendto failed");
         return false;
     }
@@ -170,7 +170,7 @@ int switchToTCP(int fd, const sockaddr *dest, unsigned char *packet, int length)
         return false;
     }
 
-    if (connect(fd, dest, sizeof(sockaddr_in)) == -1) {
+    if (connect(fd, dest, sizeof(struct sockaddr_in)) == -1) {
         perror("connect() failed\n");
         return false;
     }
@@ -184,7 +184,7 @@ int switchToTCP(int fd, const sockaddr *dest, unsigned char *packet, int length)
 int resolveTunnel(int fd, data_cache *data, unsigned char *packet, int length, struct sockaddr_in *dest) {
     unsigned char buffer[MTU] = {'\0'};
 
-    if (sendto(fd, (char *)packet, length, 0, (const sockaddr *)dest, sizeof(sockaddr_in)) < 0)
+    if (sendto(fd, (char *)packet, length, 0, (const struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0)
     {
         perror("sendto failed");
     }
@@ -223,7 +223,7 @@ int resolveTunnel(int fd, data_cache *data, unsigned char *packet, int length, s
 
             long *p;
             p = (long *)r->rdata;
-            sockaddr_in a;
+            struct sockaddr_in a;
             a.sin_addr.s_addr = (*p); // working without ntohl
             data->ipv4 = a.sin_addr.s_addr;
             dest->sin_addr.s_addr = a.sin_addr.s_addr;
@@ -238,7 +238,7 @@ int resolveTunnel(int fd, data_cache *data, unsigned char *packet, int length, s
         }
     }
     
-    dest->sin_addr.s_addr = {data->ipv4};
+    dest->sin_addr.s_addr = (in_addr_t)data->ipv4;
     return true;
 }
 
@@ -249,9 +249,10 @@ void appendMessage(unsigned char *packet, int dns_length, const unsigned char *p
 
 int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct sockaddr_in *dest)
 {
-    unsigned char buffer[MTU] = {'\0'}, payload[MTU] = {'\0'};
+    unsigned char buffer[MTU] = {'\0'};
+    unsigned char payload[MTU] = {'\0'};
 
-    dest->sin_addr.s_addr = {data->ipv4}; // fits ipv4 to struct in_addr
+    dest->sin_addr.s_addr = (in_addr_t)data->ipv4;
     dest->sin_family = AF_INET;
     dest->sin_port = htons(PORT); // set the server port (network byte order)
 
@@ -268,7 +269,7 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         if (init && msg_size < max_len)
         {
             appendMessage(packet, length, payload, msg_size);
-            if (sendto(fd, (char *)packet, length + msg_size, 0, (const sockaddr *)dest, sizeof(sockaddr_in)) < 0)
+            if (sendto(fd, (char *)packet, length + msg_size, 0, (const struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0)
             {
                 perror("sendto failed");
                 return false;
@@ -278,7 +279,7 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         else if (init)
         { // send one UDP to inform about TCP
             init = false;
-            if (!switchToTCP(fd, (const sockaddr *)dest, packet, length))
+            if (!switchToTCP(fd, (const struct sockaddr *)dest, packet, length))
                 return false;
         }
 
@@ -351,6 +352,11 @@ int main(int argc, char *argv[])
     unsigned char packet[MTU];
     int fd, ret = 0;
     struct sockaddr_in dest;
+
+    data.ipv4 = DEFAULT_NONE;
+    data.src_file = stdin;
+    memset(data.dst_file, '\0', sizeof(data.dst_file));
+    memset(data.host, '\0', sizeof(data.host));
 
     if (read_options(argc, argv, &data) == false)
         return -1;
