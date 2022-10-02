@@ -69,7 +69,7 @@ typedef struct
 #define  T_SOA 6    // authrority zone
 #define T_AAAA 28   // IPv6
 
-#define IN htons(1)        // Class
+#define IN 1        // Class
 
 #define PORT 53             // DNS port
 #define BUFFER 1024         // buffer length

@@ -147,19 +147,29 @@ void sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struc
     // resolvec DNS tunnel receiver if needed by default server
     if (data->ipv4 == DEFAULT_IPV4)
     {
-        if (sendto(fd, (char *)packet, length, 0, (const sockaddr *)dest, sizeof(sockaddr_in)) < 0) {
+        if (sendto(fd, (char *)packet, length, 0, (const sockaddr *)dest, sizeof(sockaddr_in)) < 0)
+        {
             perror("sendto failed");
         }
         int i = sizeof(dest);
-        if (recvfrom(fd, (char *)buffer, MTU, 0, (struct sockaddr *)dest, (socklen_t *)&i) < 0) {
+        if (recvfrom(fd, (char *)buffer, MTU, 0, (struct sockaddr *)dest, (socklen_t *)&i) < 0)
+        {
             perror("recvfrom failed");
         }
+        for (int i = 0; i < 100; i++)
+            fprintf(stderr, "%c", buffer[i]);
         dns_header *dns = (dns_header *)buffer;
-        unsigned char *reply = &(buffer[length]);
+        unsigned char *reply = &buffer[length];
+
+        printf("\nThe response contains : ");
+        printf("\n %d Questions.", ntohs(dns->q_count));
+        printf("\n %d Answers.", ntohs(dns->ans_count));
+        printf("\n %d Authoritative Servers.", ntohs(dns->auth_count));
+        printf("\n %d Additional records.\n\n", ntohs(dns->add_count));
 
         for (i = 0; i < ntohs(dns->ans_count); i++)
         {
-            int stop;
+            int stop = 0;
             res_record res;
             res_record *r = &res;
             r->name = ReadName(reply, buffer, &stop);
@@ -199,13 +209,16 @@ void sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struc
     // check the length of input message
     // send UDP with either info for opening a TCP connection for multiple packets
     // or sending UDP packet with payload
-    if (sendto(fd, (char *)packet, length, 0, (const sockaddr *)dest, sizeof(sockaddr_in)) < 0) {
+    if (sendto(fd, (char *)packet, length, 0, (const sockaddr *)dest, sizeof(sockaddr_in)) < 0)
+    {
         perror("sendto failed");
     }
 }
 
-void init_header(dns_header *dns) {
-    dns->id = (unsigned short)htons(getpid());
+void init_header(dns_header *dns)
+{
+    // dns->id = (unsigned short)htons(getpid());
+    dns->id = 10;
 
     dns->qr = 0;
     dns->opcode = 0;
@@ -234,7 +247,7 @@ void ChangetoDnsNameFormat(unsigned char *dns, data_cache *data)
     {
         if (data->host[i] == '.')
         {
-            *dns++ = i - lock + '0';
+            *dns++ = i - lock;
             for (; lock < i; lock++)
             {
                 *dns++ = data->host[lock];
@@ -269,8 +282,8 @@ int main(int argc, char *argv[])
     ChangetoDnsNameFormat(qname, &data);
 
     question *qinfo = (question *)&(packet[HEADER_SIZE + strlen((const char *)qname) + 1]); // +1 for \0
-    qinfo->qtype = T_A;                                                                     // we want IP address (in case we need to resolve DNS receiver)
-    qinfo->qclass = IN;
+    qinfo->qtype = ntohs(T_A);                                                                     // we want IP address (in case we need to resolve DNS receiver)
+    qinfo->qclass = htons(IN);
 
     sendIPv4(fd, &data, packet, HEADER_SIZE + strlen((const char *)qname) + 1 + sizeof(question), &dest);
 
