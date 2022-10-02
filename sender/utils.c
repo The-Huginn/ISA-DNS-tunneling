@@ -6,6 +6,10 @@
 
 #include "utils.h"
 
+#ifndef _XOPEN_SOURCE
+    #define _XOPEN_SOURCE
+#endif // !_XOPEN_SOURCE
+
  int read_options(int argc, char **argv, data_cache *data) {
     int c;
     // Suppresses warnings in stderr
