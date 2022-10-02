@@ -14,59 +14,7 @@
 
 #include "dns_sender.h"
 #include "utils.h"
-
-u_char *ReadName(unsigned char *reader, unsigned char *buffer, int *count) {
-    unsigned char *name;
-    unsigned int p = 0, jumped = 0, offset;
-    int i, j;
-
-    *count = 1;
-    name = (unsigned char *)malloc(256);
-
-    name[0] = '\0';
-
-    // read the names in 3www6google3com format
-    while (*reader != 0)
-    {
-        if (*reader >= 192)
-        {
-            offset = (*reader) * 256 + *(reader + 1) - 49152; // 49152 = 11000000 00000000 ;)
-            reader = buffer + offset - 1;
-            jumped = 1; // we have jumped to another location so counting wont go up!
-        }
-        else
-        {
-            name[p++] = *reader;
-        }
-
-        reader = reader + 1;
-
-        if (jumped == 0)
-        {
-            *count = *count + 1; // if we havent jumped to another location then we can count up
-        }
-    }
-
-    name[p] = '\0'; // string complete
-    if (jumped == 1)
-    {
-        *count = *count + 1; // number of steps we actually moved forward in the packet
-    }
-
-    // now convert 3www6google3com0 to www.google.com
-    for (i = 0; i < (int)strlen((const char *)name); i++)
-    {
-        p = name[i];
-        for (j = 0; j < (int)p; j++)
-        {
-            name[i] = name[i + 1];
-            i = i + 1;
-        }
-        name[i] = '.';
-    }
-    name[i - 1] = '\0'; // remove the last dot
-    return name;
-}
+#include "../helpers/dnsUtils.h"
 
 /**
  * @brief Tries to resolve tunnel provided by host name
@@ -184,26 +132,6 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
     return true;
 }
 
-void ChangetoDnsNameFormat(unsigned char *dns, data_cache *data)
-{
-    int lock = 0, i;
-    strcat(data->host, ".");
-
-    for (i = 0; i < strlen(data->host); i++)
-    {
-        if (data->host[i] == '.')
-        {
-            *dns++ = i - lock;
-            for (; lock < i; lock++)
-            {
-                *dns++ = data->host[lock];
-            }
-            lock++;
-        }
-    }
-    *dns++ = '\0';
-}
-
 int getDNSServer(data_cache *data)
 {
     FILE *fp;
@@ -255,7 +183,7 @@ int main(int argc, char *argv[]) {
 
     initHeader((dns_header *)packet);
     unsigned char *qname = &(packet[HEADER_SIZE]);
-    ChangetoDnsNameFormat(qname, &data);
+    ChangetoDnsNameFormat(qname, data.host);
 
     question *qinfo = (question *)&(packet[HEADER_SIZE + strlen((const char *)qname) + 1]); // +1 for \0
     qinfo->qtype = ntohs(T_A);                                                              // we want IP address (in case we need to resolve DNS receiver)
