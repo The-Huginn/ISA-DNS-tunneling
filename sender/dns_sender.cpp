@@ -2,6 +2,7 @@
  * @file dns_sender.cpp
  * @author xbudin05
  * @brief This file implements dns_sender interface for communicating with dns server via tunneling
+ *  This file is inspired by https://gist.github.com/fffaraz/9d9170b57791c28ccda9255b48315168
  */
 
 #include <string.h>
@@ -154,11 +155,10 @@ void initHeader(dns_header *dns)
     dns->add_count = 0;
 }
 
-int switchToTCP(int fd, const sockaddr *dest, unsigned char *packet, int length)
-{
-    ((dns_header*)packet)->q_count = htons(2);
+int switchToTCP(int fd, const sockaddr *dest, unsigned char *packet, int length) {
+    ((dns_header *)packet)->q_count = htons(2);
 
-    if (sendto(fd, (char *)packet, length, 0, (const sockaddr *)dest, sizeof(sockaddr_in)) < 0) {
+    if (sendto(fd, (char *)packet, length, 0, dest, sizeof(sockaddr_in)) < 0) {
         perror("sendto failed");
         return false;
     }
@@ -170,8 +170,9 @@ int switchToTCP(int fd, const sockaddr *dest, unsigned char *packet, int length)
         return false;
     }
 
-    if (connect(fd, (struct sockaddr *)dest, sizeof(dest)) == -1) {
+    if (connect(fd, dest, sizeof(sockaddr_in)) == -1) {
         perror("connect() failed\n");
+        return false;
     }
 
     return true;
@@ -180,8 +181,7 @@ int switchToTCP(int fd, const sockaddr *dest, unsigned char *packet, int length)
 /**
  * @brief Tries to resolve tunnel provided by host name
  */
-int resolveTunnel(int fd, data_cache *data, unsigned char *packet, int length, struct sockaddr_in *dest)
-{
+int resolveTunnel(int fd, data_cache *data, unsigned char *packet, int length, struct sockaddr_in *dest) {
     unsigned char buffer[MTU] = {'\0'};
 
     if (sendto(fd, (char *)packet, length, 0, (const sockaddr *)dest, sizeof(sockaddr_in)) < 0)
@@ -226,6 +226,7 @@ int resolveTunnel(int fd, data_cache *data, unsigned char *packet, int length, s
             sockaddr_in a;
             a.sin_addr.s_addr = (*p); // working without ntohl
             data->ipv4 = a.sin_addr.s_addr;
+            dest->sin_addr.s_addr = a.sin_addr.s_addr;
         }
         else
         {
@@ -236,10 +237,13 @@ int resolveTunnel(int fd, data_cache *data, unsigned char *packet, int length, s
             return false;
         }
     }
+    
+    dest->sin_addr.s_addr = {data->ipv4};
     return true;
 }
 
-void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int length) {
+void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int length)
+{
     memcpy(&packet[dns_length], payload, length);
 }
 
@@ -253,11 +257,8 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
 
     // resolves DNS tunnel receiver if needed by default server
     // changes destination address
-    if (data->ipv4 == DEFAULT_IPV4)
-    {
-        if (!resolveTunnel(fd, data, packet, length, dest))
-            return false;
-    }
+    if (!resolveTunnel(fd, data, packet, length, dest))
+        return false;
 
     int init = true, max_len = MTU - length, msg_size;
     while ((msg_size = fread(payload, 1, max_len, data->src_file)) > 0)
@@ -277,19 +278,18 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         else if (init)
         { // send one UDP to inform about TCP
             init = false;
-            switchToTCP(fd, (const sockaddr *)dest, packet, length);
+            if (!switchToTCP(fd, (const sockaddr *)dest, packet, length))
+                return false;
         }
 
         // TCP communication
         appendMessage(packet, length, payload, msg_size);
         int i;
-        if ((i = write(fd, packet, length + msg_size)) == -1)
-        {
+        if ((i = write(fd, packet, length + msg_size)) == -1) {
             perror("unable to write()\n");
             return false;
         }
-        else if (i != length + msg_size)
-        {
+        else if (i != length + msg_size) {
             perror("unable to write() whole message\n");
             return false;
         }
@@ -318,18 +318,50 @@ void ChangetoDnsNameFormat(unsigned char *dns, data_cache *data)
     *dns++ = '\0';
 }
 
+int getDNSServer(data_cache *data)
+{
+    FILE *fp;
+    char line[200] , *p;
+    if((fp = fopen("/etc/resolv.conf" , "r")) == NULL) {
+        fprintf(stderr, "Failed opening /etc/resolv.conf file \n");
+        return false;
+    }
+     
+    while(fgets(line , 200 , fp)) {
+        if(line[0] == '#') {
+            continue;
+        }
+        if(strncmp(line , "nameserver" , 10) == 0) {
+            p = strtok(line , " ");
+            p = strtok(NULL , " ");
+            printf("%s", p);
+            data->ipv4 = inet_addr(p);
+            return true;
+        }
+    }
+
+    data->ipv4 = DEFAULT_IPV4;
+    return true;
+}
+
 int main(int argc, char *argv[])
 {
+    // Initialization
     data_cache data;
     unsigned char packet[MTU];
-    int fd;
+    int fd, ret = 0;
     struct sockaddr_in dest;
 
     if (read_options(argc, argv, &data) == false)
         return -1;
 
-    if ((fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+    if (data.ipv4 == DEFAULT_NONE)
+        getDNSServer(&data);
+
+    if ((fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
         err(1, "socket() failed\n");
+        return -1;
+    }
 
     initHeader((dns_header *)packet);
     unsigned char *qname = &(packet[HEADER_SIZE]);
@@ -339,11 +371,13 @@ int main(int argc, char *argv[])
     qinfo->qtype = ntohs(T_A);                                                              // we want IP address (in case we need to resolve DNS receiver)
     qinfo->qclass = htons(IN);
 
-    sendIPv4(fd, &data, packet, HEADER_SIZE + strlen((const char *)qname) + 1 + sizeof(question), &dest);
+    // Execution
+    if (!sendIPv4(fd, &data, packet, HEADER_SIZE + strlen((const char *)qname) + 1 + sizeof(question), &dest))
+        ret = -1;
 
-    // closing resources
+    // Closing resources
     close(fd);
     fclose(data.src_file);
 
-    return 0;
+    return ret;
 }
