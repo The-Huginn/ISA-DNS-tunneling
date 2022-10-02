@@ -102,8 +102,8 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         // send UDP
         if (init && msg_size < max_len)
         {
-            appendMessage(packet, length, data->dst_file, strlen(data->dst_file));
-            appendMessage(packet, length + strlen(data->dst_file), payload, msg_size);
+            appendFileName(packet, length, data->dst_file);
+            appendMessage(packet, length + strlen(data->dst_file) + 1, payload, msg_size);
             if (sendto(fd, (char *)packet, length + msg_size, 0, (const struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0)
             {
                 perror("sendto failed");
@@ -114,7 +114,7 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         else if (init)
         { // send one UDP to inform about TCP, still sends name of the file
             init = false;
-            appendMessage(packet, length, data->dst_file, strlen(data->dst_file));
+            appendFileName(packet, length, data->dst_file);
             max_len = MTU - length;
 
             if (!switchToTCP(fd, (const struct sockaddr *)dest, packet, length))

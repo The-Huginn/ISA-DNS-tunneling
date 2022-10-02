@@ -116,3 +116,7 @@ int switchToTCP(int fd, const struct sockaddr *dest, unsigned char *packet, int 
 void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int length) {
     memcpy(&packet[dns_length], payload, length);
 }
+
+void appendFileName(unsigned char *packet, int dns_length, const unsigned char *file) {
+    strcpy(&packet[dns_length], file);
+}
