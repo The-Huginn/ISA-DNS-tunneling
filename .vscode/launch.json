@@ -30,6 +30,32 @@
                     "ignoreFailures": true
                 }
             ]
+        },
+        {
+            "name": "DNS receiver",
+            "type": "cppdbg",
+            "request": "launch",
+            "preLaunchTask": "DNS receiver build",
+            "program": "${workspaceFolder}/receiver/dns_receiver",
+            "args": ["example.com", "./"],
+            "stopAtEntry": true,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "launchCompleteCommand": "exec-run",
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description":  "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
         }
 
     ]
