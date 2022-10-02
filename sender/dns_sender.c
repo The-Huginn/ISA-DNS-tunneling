@@ -5,82 +5,17 @@
  *  This file is inspired by https://gist.github.com/fffaraz/9d9170b57791c28ccda9255b48315168
  */
 
-#include <string.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <unistd.h>
 #include <netdb.h>
 #include <err.h>
 #include <regex.h>
-#include <unistd.h>
 
 #include "dns_sender.h"
 #include "utils.h"
 
-int read_options(int argc, char **argv, data_cache *data)
-{
-
-    int c;
-    // Suppresses warnings in stderr
-    opterr = 0;
-    while ((c = getopt(argc, argv, "b:u:")) != -1)
-    {
-
-        switch (c)
-        {
-        case 'b': // base host
-            memcpy(data->host, optarg, STRING_SIZE);
-            break;
-
-        case 'u': // upstream dns ip
-            data->ipv4 = inet_addr(optarg);
-            if (data->ipv4 == -1)
-            {
-                fprintf(stderr, "Invalid IPv4 address\n");
-                return false;
-            }
-            break;
-
-        case '?':
-        case ':':
-            fprintf(stderr, "Unknown option or missing argument...\n");
-            return false;
-            break;
-
-        default:
-            fprintf(stderr, "Problemo\n");
-            return false;
-            break;
-        }
-    }
-
-    if (optind < 1 || optind >= argc)
-    {
-        fprintf(stderr, "Missing destination file\n");
-        return false;
-    }
-
-    memcpy(data->dst_file, argv[optind], STRING_SIZE);
-    optind++;
-
-    // We take input from stdin
-    if (optind >= argc)
-        return true;
-
-    data->src_file = fopen(argv[optind], "r");
-
-    if (data->src_file == NULL)
-    {
-        fprintf(stderr, "Unable to open provided input file\n");
-        return false;
-    }
-
-    return true;
-}
-
-u_char *ReadName(unsigned char *reader, unsigned char *buffer, int *count)
-{
+u_char *ReadName(unsigned char *reader, unsigned char *buffer, int *count) {
     unsigned char *name;
     unsigned int p = 0, jumped = 0, offset;
     int i, j;
@@ -131,51 +66,6 @@ u_char *ReadName(unsigned char *reader, unsigned char *buffer, int *count)
     }
     name[i - 1] = '\0'; // remove the last dot
     return name;
-}
-
-void initHeader(dns_header *dns)
-{
-    dns->id = (unsigned short)htons(getpid());
-
-    dns->qr = 0;
-    dns->opcode = 0;
-    dns->aa = 0;
-    dns->tc = 0;
-    dns->rd = 1;
-
-    dns->ra = 0;
-    dns->z = 0;
-    dns->ad = 0;
-    dns->cd = 0;
-    dns->rcode = 0;
-
-    dns->q_count = htons(1);
-    dns->ans_count = 0;
-    dns->auth_count = 0;
-    dns->add_count = 0;
-}
-
-int switchToTCP(int fd, const struct sockaddr *dest, unsigned char *packet, int length) {
-    ((dns_header *)packet)->q_count = htons(2);
-
-    if (sendto(fd, (char *)packet, length, 0, dest, sizeof(struct sockaddr_in)) < 0) {
-        perror("sendto failed");
-        return false;
-    }
-    close(fd);
-
-    // open TCP
-    if ((fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
-        perror("socket() failed\n");
-        return false;
-    }
-
-    if (connect(fd, dest, sizeof(struct sockaddr_in)) == -1) {
-        perror("connect() failed\n");
-        return false;
-    }
-
-    return true;
 }
 
 /**
@@ -240,11 +130,6 @@ int resolveTunnel(int fd, data_cache *data, unsigned char *packet, int length, s
     
     dest->sin_addr.s_addr = (in_addr_t)data->ipv4;
     return true;
-}
-
-void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int length)
-{
-    memcpy(&packet[dns_length], payload, length);
 }
 
 int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct sockaddr_in *dest)
@@ -345,8 +230,7 @@ int getDNSServer(data_cache *data)
     return true;
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     // Initialization
     data_cache data;
     unsigned char packet[MTU];
