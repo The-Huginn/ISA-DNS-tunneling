@@ -182,7 +182,7 @@ int main(int argc, char *argv[]) {
         getDNSServer(&data);
 
     if ((fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
-        err(1, "socket() failed\n");
+        fprintf(stderr, "socket() failed\n");
         return -1;
     }
 
