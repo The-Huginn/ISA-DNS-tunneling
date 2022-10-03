@@ -6,4 +6,8 @@
 #ifndef __UTILS__
 #define __UTILS__
 
+extern int fd;
+
+int openUDP();
+
 #endif // !__UTILS__
