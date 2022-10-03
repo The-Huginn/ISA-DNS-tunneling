@@ -8,6 +8,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <arpa/inet.h>
 
 u_char *ReadName(unsigned char *reader, unsigned char *buffer, int *count) {
     unsigned char *name;
@@ -79,4 +80,8 @@ void ChangetoDnsNameFormat(unsigned char *dns, unsigned char* host) {
         }
     }
     *dns++ = '\0';
+}
+
+int checkProto(dns_header* dns, int proto) {
+    return ntohs(dns->q_count) == proto;
 }
