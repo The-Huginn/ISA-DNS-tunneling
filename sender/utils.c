@@ -45,6 +45,11 @@
         }
     }
 
+    if (data->ipv4 == DEFAULT_IPV4 && data->host[0] == '\0') { // nothing set
+        fprintf(stderr, "Missing IP or host\n");
+        return false;
+    }
+
     if (optind < 1 || optind >= argc)
     {
         fprintf(stderr, "Missing destination file\n");

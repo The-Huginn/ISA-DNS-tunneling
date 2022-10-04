@@ -21,6 +21,7 @@
  */
 int resolveTunnel(int fd, data_cache *data, unsigned char *packet, int length, struct sockaddr_in *dest) {
     unsigned char buffer[MTU] = {'\0'};
+    dest->sin_addr.s_addr = (in_addr_t)data->ipv4;
 
     if (sendto(fd, (char *)packet, length, 0, (const struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0)
     {
@@ -65,6 +66,7 @@ int resolveTunnel(int fd, data_cache *data, unsigned char *packet, int length, s
             a.sin_addr.s_addr = (*p); // working without ntohl
             data->ipv4 = a.sin_addr.s_addr;
             dest->sin_addr.s_addr = a.sin_addr.s_addr;
+            return true;
         }
         else
         {
@@ -76,23 +78,15 @@ int resolveTunnel(int fd, data_cache *data, unsigned char *packet, int length, s
         }
     }
     
-    dest->sin_addr.s_addr = (in_addr_t)data->ipv4;
-    return true;
+    fprintf(stderr, "Unable to resolve host\n");
+    return false;
 }
 
 int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct sockaddr_in *dest)
 {
     unsigned char buffer[MTU] = {'\0'};
     unsigned char payload[MTU] = {'\0'};
-
     dest->sin_addr.s_addr = (in_addr_t)data->ipv4;
-    dest->sin_family = AF_INET;
-    dest->sin_port = htons(PORT); // set the server port (network byte order)
-
-    // resolves DNS tunnel receiver if needed by default server
-    // changes destination address
-    if (!resolveTunnel(fd, data, packet, length, dest))
-        return false;
 
     // max_len can be without the packet header and destination file name (only for the first packet)
     int init = true, max_len = MTU - length - strlen(data->dst_file), msg_size;
@@ -159,8 +153,7 @@ int getDNSServer(data_cache *data)
         }
     }
 
-    data->ipv4 = DEFAULT_IPV4;
-    return true;
+    return false;
 }
 
 int main(int argc, char *argv[]) {
@@ -175,16 +168,11 @@ int main(int argc, char *argv[]) {
     memset(data.dst_file, '\0', sizeof(data.dst_file));
     memset(data.host, '\0', sizeof(data.host));
 
+    dest.sin_family = AF_INET;
+    dest.sin_port = htons(PORT); // set the server port (network byte order)
+
     if (read_options(argc, argv, &data) == false)
         return -1;
-
-    if (data.ipv4 == DEFAULT_NONE)
-        getDNSServer(&data);
-
-    if ((fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
-        fprintf(stderr, "socket() failed\n");
-        return -1;
-    }
 
     initHeader((dns_header *)packet);
     unsigned char *qname = &(packet[HEADER_SIZE]);
@@ -193,6 +181,18 @@ int main(int argc, char *argv[]) {
     question *qinfo = (question *)&(packet[HEADER_SIZE + strlen((const char *)qname) + 1]); // +1 for \0
     qinfo->qtype = ntohs(T_A);                                                              // we want IP address (in case we need to resolve DNS receiver)
     qinfo->qclass = htons(IN);
+
+    if ((fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+        fprintf(stderr, "socket() failed\n");
+        return -1;
+    }
+
+    if (data.ipv4 == DEFAULT_NONE)
+        if (!getDNSServer(&data))   // get DNS server for resolution
+            return -1;
+        else
+            if (!resolveTunnel(fd, &data, packet, HEADER_SIZE + strlen((const char *)qname) + 1 + sizeof(question), &dest)) // resolve custom DNS server
+                return -1;
 
     // Execution
     if (!sendIPv4(fd, &data, packet, HEADER_SIZE + strlen((const char *)qname) + 1 + sizeof(question), &dest))
