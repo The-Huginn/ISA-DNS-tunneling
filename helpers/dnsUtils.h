@@ -13,7 +13,8 @@
 #define true 1
 #define false 0
 #define STRING_SIZE 255
-#define MTU 1400        // some room for lower layers
+#define TCP_MTU 1400        // some room for lower layers
+#define UDP_MTU 512         // By RFC 1035
 #define HEADER_SIZE sizeof(dns_header)
 #define OPEN_UDP 1
 #define OPEN_TCP 2

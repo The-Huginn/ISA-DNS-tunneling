@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <unistd.h>
 
 u_char *ReadName(unsigned char *reader, unsigned char *buffer, int *count) {
     unsigned char *name;

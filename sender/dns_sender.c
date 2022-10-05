@@ -52,14 +52,14 @@ int resolveTunnel(int fd, data_cache *data, unsigned char *packet, int length, s
         return false;
 
     dest->sin_addr.s_addr = dnsServer;
-    unsigned char buffer[MTU] = {'\0'};
+    unsigned char buffer[UDP_MTU] = {'\0'};
 
     if (sendto(fd, (char *)packet, length, 0, (const struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0)
     {
         perror("sendto failed");
     }
     int i = sizeof(dest);
-    if (recvfrom(fd, (char *)buffer, MTU, 0, (struct sockaddr *)dest, (socklen_t *)&i) < 0)
+    if (recvfrom(fd, (char *)buffer, UDP_MTU, 0, (struct sockaddr *)dest, (socklen_t *)&i) < 0)
     {
         perror("recvfrom failed");
     }
@@ -115,12 +115,11 @@ int resolveTunnel(int fd, data_cache *data, unsigned char *packet, int length, s
 
 int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct sockaddr_in *dest)
 {
-    unsigned char buffer[MTU] = {'\0'};
-    unsigned char payload[MTU] = {'\0'};
+    unsigned char payload[TCP_MTU] = {'\0'};
     dest->sin_addr.s_addr = (in_addr_t)data->ipv4;
 
-    // max_len can be without the packet header and destination file name (only for the first packet)
-    int init = true, max_len = MTU - length - strlen(data->dst_file), msg_size;
+    // max_len can be without the packet header and destination file name transfered via UDP (only for the first packet)
+    int init = true, max_len = UDP_MTU - length - strlen(data->dst_file), msg_size;
     while ((msg_size = fread(payload, 1, max_len, data->src_file)) > 0)
     {
 
@@ -140,7 +139,7 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         { // send one UDP to inform about TCP, still sends name of the file
             init = false;
             appendFileName(packet, length, data->dst_file);
-            max_len = MTU - length;
+            max_len = TCP_MTU - length;
 
             if (!switchToTCP(fd, (const struct sockaddr *)dest, packet, length))
                 return false;
@@ -165,7 +164,7 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
 int main(int argc, char *argv[]) {
     // Initialization
     data_cache data;
-    unsigned char packet[MTU];
+    unsigned char packet[TCP_MTU];  // for UDP communication only UDP_MTU should be used
     int fd, ret = 0;
     struct sockaddr_in dest;
 
