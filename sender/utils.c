@@ -45,8 +45,8 @@
         }
     }
 
-    if (data->ipv4 == DEFAULT_IPV4 && data->host[0] == '\0') { // nothing set
-        fprintf(stderr, "Missing IP or host\n");
+    if (data->host[0] == '\0') {
+        fprintf(stderr, "Missing host\n");
         return false;
     }
 
