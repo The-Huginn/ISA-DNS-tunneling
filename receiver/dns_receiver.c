@@ -37,35 +37,37 @@ void my_handler(int s)
 
 int serverTCP(struct sockaddr_in *server)
 {
-
     close(fd);
 
     if ((fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1)
     {
-        fprintf(stderr, "socket(): could not create the socket");
+        fprintf(stderr, "socket(): could not create the socket\n");
         return false;
     }
 
-    if (bind(fd, (struct sockaddr *)&server, sizeof(server)) < 0)
+    if (bind(fd, (struct sockaddr *)server, sizeof(struct sockaddr_in)) < 0)
     {
-        fprintf(stderr, "bind() failed");
+        err(1, "help");
+        fprintf(stderr, "TCP binding failed'n");
         return false;
     }
 
     if (listen(fd, 1) == -1)
     {
-        fprintf(stderr, "listen() failed");
+        fprintf(stderr, "TCP listen failed\n");
         return false;
     }
 
     struct sockaddr_in from;
-    int len = sizeof(from), newSock, msg_len;
+    int newSock, msg_len;
+    socklen_t len = sizeof(from);
     char buffer[TCP_MTU];
 
     while (true)
     {
-        if ((newSock = accept(newSock, (struct sockaddr *)&from, (socklen_t *)&len)) == -1)
+        if ((newSock = accept(fd, (struct sockaddr *)&from, &len)) == -1)
         {
+            err(1, "help");
             fprintf(stderr, "accept failed\n");
             return false;
         }
@@ -163,6 +165,7 @@ int serverUDP(struct sockaddr_in *server, char **argv)
             }
         }
 
+        fclose(output);
         // send a reply
         sendReply(fd, returnCode, qname, (struct sockaddr*)&client);
     }

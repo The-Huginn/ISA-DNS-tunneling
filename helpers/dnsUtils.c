@@ -127,9 +127,8 @@ int sendReply(int fd, unsigned char* returnCode, unsigned char* qname, struct so
     strcpy((unsigned char *)&rData[1], returnCode); // move by the r data section
 
     int msg_len, reply_len = HEADER_SIZE + 2*(strlen(qname) + 1) + sizeof(question) + sizeof(r_data) + strlen(returnCode) + 1;
-    socklen_t len = sizeof(*client);
 
-    if ((msg_len = sendto(fd, reply, reply_len, 0, client, len)) == -1) {
+    if ((msg_len = sendto(fd, reply, reply_len, 0, client, sizeof(struct sockaddr_in))) == -1) {
         fprintf(stderr, "Failed to send reply to client\n");
         return false;
     }
