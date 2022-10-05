@@ -6,6 +6,8 @@
 #include "utils.h"
 #include <stdio.h>
 #include <arpa/inet.h>
+#include <unistd.h>
+
 
 int openUDP(struct sockaddr* server) {
     if ((fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
