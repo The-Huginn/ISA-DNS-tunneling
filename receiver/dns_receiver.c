@@ -90,8 +90,7 @@ int serverTCP(struct sockaddr_in *server)
         if (checkProto((dns_header *)buffer, OPEN_UDP))
         {
             close(fd);
-            openUDP((struct sockaddr *)server);
-            break;
+            return openUDP((struct sockaddr *)server);
         }
     }
 
@@ -104,17 +103,20 @@ int serverUDP(struct sockaddr_in *server, char **argv)
     unsigned char *path = argv[2];
 
     int msg_size, i;
-    char buffer[UDP_MTU], qname[STRING_SIZE + 1], file[STRING_SIZE + 1];
+    char buffer[UDP_MTU];
     struct sockaddr_in client;
     socklen_t length;
 
-    openUDP((struct sockaddr *)server);
+    if (!openUDP((struct sockaddr *)server))
+        return false;
 
     length = sizeof(client);
 
     while ((msg_size = recvfrom(fd, buffer, UDP_MTU, 0, (struct sockaddr *)&client, &length)) >= 0)
     {
-        unsigned char returnCode[30] = "OK\0";
+        unsigned char qname[STRING_SIZE + 1] = {'\0'}, file[STRING_SIZE + 1] = {'\0'};
+        fprintf(stderr, "Server received packet\n");
+        unsigned char returnCode[RETURN_CODE] = "OK\0";
 
         // copy qname
         strcpy(qname, &buffer[HEADER_SIZE]);
@@ -135,48 +137,34 @@ int serverUDP(struct sockaddr_in *server, char **argv)
         strcpy(fullPath, path);
         strcpy(&fullPath[strlen(path)], file);
 
-        if ((output = fopen(fullPath, "wb")) == NULL)
+        if ((output = fopen(fullPath, "w")) == NULL)
         {
             fprintf(stderr, "Unable to open file [%s]\n", fullPath);
             strcpy(returnCode, "unable to open file");
         }
 
         // checks if TCP is needed, otherwise writes data here
-        if (((dns_header *)&buffer)->q_count == htons(2))
+        if (checkProto((dns_header*)buffer, OPEN_TCP))
         { // TCP needed
+            fprintf(stderr, "TCP connection needed\n");
             if (!serverTCP(server))
                 strcpy(returnCode, "TCP transfer failed");
         }
         else
         { // all payload in current UDP packet
+            fprintf(stderr, "UDP connection sufficient\n");
             for (int i = 0; i < msg_size; i++)
             {
-                if (fputc(*payload, output) == EOF)
+                if (fputc(payload[i], output) == EOF)
                 {
                     fprintf(stderr, "Problem writing into file\n");
                     strcpy(returnCode, "unable to write to file");
                 }
-                payload++;
             }
         }
 
         // send a reply
-        unsigned char reply[UDP_MTU];
-        initHeader((dns_header *)reply);
-        strcpy(&(reply[HEADER_SIZE]), qname);
-
-        question *qinfo = (question *)&(reply[HEADER_SIZE + strlen((const char *)qname) + 1]); // +1 for \0
-        qinfo->qtype = ntohs(T_A);                                                              // we want IP address (in case we need to resolve DNS receiver)
-        qinfo->qclass = htons(IN);
-
-        res_record* rRecord = (res_record*)&reply[HEADER_SIZE + strlen((const char*)qname) + 1 + sizeof(question)];
-        strcpy(rRecord->name, qname);
-        r_data* rData = rRecord->resource;
-        rData->type = ntohs(T_A);
-        rData->_class = ntohs(IN);
-        rData->ttl = ntohl(14400);
-        rData->data_len = ntohl(sizeof(returnCode));
-        strcpy(rRecord->rdata, returnCode);
+        sendReply(fd, returnCode, qname, (struct sockaddr*)&client);
     }
 
     return true;
@@ -204,5 +192,5 @@ int main(int argc, char **argv)
     fclose(output);
     close(fd);
 
-    return 0;
+    return -1;
 }

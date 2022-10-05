@@ -7,11 +7,13 @@
 #include "dnsUtils.h"
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
-#include <arpa/inet.h>
 #include <unistd.h>
+#include <err.h>
 
-u_char *ReadName(unsigned char *reader, unsigned char *buffer, int *count) {
+u_char *ReadName(unsigned char *reader, unsigned char *buffer, int *count)
+{
     unsigned char *name;
     unsigned int p = 0, jumped = 0, offset;
     int i, j;
@@ -64,7 +66,8 @@ u_char *ReadName(unsigned char *reader, unsigned char *buffer, int *count) {
     return name;
 }
 
-void initHeader(dns_header *dns) {
+void initHeader(dns_header *dns)
+{
     dns->id = (unsigned short)htons(getpid());
 
     dns->qr = 0;
@@ -85,7 +88,8 @@ void initHeader(dns_header *dns) {
     dns->add_count = 0;
 }
 
-void ChangetoDnsNameFormat(unsigned char *dns, unsigned char* host) {
+void ChangetoDnsNameFormat(unsigned char *dns, unsigned char *host)
+{
     int lock = 0, i;
     strcat(host, ".");
 
@@ -104,6 +108,40 @@ void ChangetoDnsNameFormat(unsigned char *dns, unsigned char* host) {
     *dns++ = '\0';
 }
 
-int checkProto(dns_header* dns, int proto) {
+int sendReply(int fd, unsigned char* returnCode, unsigned char* qname, struct sockaddr* client)
+{
+    unsigned char reply[UDP_MTU];
+    initHeader((dns_header *)reply);
+    strcpy(&(reply[HEADER_SIZE]), qname);
+
+    question *qinfo = (question *)&(reply[HEADER_SIZE + strlen((const char *)qname) + 1]); // +1 for \0
+    qinfo->qtype = ntohs(T_A);                                                             // we want IP address (in case we need to resolve DNS receiver)
+    qinfo->qclass = htons(IN);
+    unsigned char *rName = &reply[HEADER_SIZE + strlen((const char *)qname) + 1 + sizeof(question)];
+    strcpy(rName, qname);
+    r_data *rData = (r_data *)(&rName[strlen(qname) + 1]); // move behind the qname
+    rData->type = ntohs(T_A);
+    rData->_class = ntohs(IN);
+    rData->ttl = ntohl(14400);
+    rData->data_len = ntohl(sizeof(returnCode));
+    strcpy((unsigned char *)&rData[1], returnCode); // move by the r data section
+
+    int msg_len, reply_len = HEADER_SIZE + 2*(strlen(qname) + 1) + sizeof(question) + sizeof(r_data) + strlen(returnCode) + 1;
+    socklen_t len = sizeof(*client);
+
+    if ((msg_len = sendto(fd, reply, reply_len, 0, client, len)) == -1) {
+        fprintf(stderr, "Failed to send reply to client\n");
+        return false;
+    }
+    if (msg_len != reply_len) {
+        fprintf(stderr, "Not full message sent to client\n");
+        return false;
+    }
+
+    return true;
+}
+
+int checkProto(dns_header *dns, int proto)
+{
     return ntohs(dns->q_count) == proto;
 }

@@ -7,6 +7,7 @@
 #define __DNSUTILS__
 
 #include <sys/types.h>
+#include <arpa/inet.h>
 
 #include "dnsHeader.h"
 
@@ -18,12 +19,15 @@
 #define HEADER_SIZE sizeof(dns_header)
 #define OPEN_UDP 1
 #define OPEN_TCP 2
+#define RETURN_CODE 50
 
 u_char *ReadName(unsigned char *reader, unsigned char *buffer, int *count);
 
 void ChangetoDnsNameFormat(unsigned char *dns, unsigned char* host);
 
 void initHeader(dns_header *dns);
+
+int sendReply(int fd, unsigned char* returnCode, unsigned char* qname, struct sockaddr* client);
 
 /**
  * @return true upon proto being the same as q_count
