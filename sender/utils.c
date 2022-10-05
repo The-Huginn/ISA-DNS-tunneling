@@ -75,14 +75,8 @@
 }
 
 int switchToTCP(int fd, const struct sockaddr *dest, unsigned char *packet, int length) {
-    ((dns_header *)packet)->q_count = htons(2);
-
-    if (sendto(fd, (char *)packet, length, 0, dest, sizeof(struct sockaddr_in)) < 0) {
-        perror("sendto failed");
-        return false;
-    }
     close(fd);
-
+    
     // open TCP
     if ((fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
         perror("socket() failed\n");
