@@ -74,27 +74,6 @@
     return true;
 }
 
-void initHeader(dns_header *dns) {
-    dns->id = (unsigned short)htons(getpid());
-
-    dns->qr = 0;
-    dns->opcode = 0;
-    dns->aa = 0;
-    dns->tc = 0;
-    dns->rd = 1;
-
-    dns->ra = 0;
-    dns->z = 0;
-    dns->ad = 0;
-    dns->cd = 0;
-    dns->rcode = 0;
-
-    dns->q_count = htons(1);
-    dns->ans_count = 0;
-    dns->auth_count = 0;
-    dns->add_count = 0;
-}
-
 int switchToTCP(int fd, const struct sockaddr *dest, unsigned char *packet, int length) {
     ((dns_header *)packet)->q_count = htons(2);
 

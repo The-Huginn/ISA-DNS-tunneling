@@ -22,6 +22,8 @@ u_char *ReadName(unsigned char *reader, unsigned char *buffer, int *count);
 
 void ChangetoDnsNameFormat(unsigned char *dns, unsigned char* host);
 
+void initHeader(dns_header *dns);
+
 /**
  * @return true upon proto being the same as q_count
  */

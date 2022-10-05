@@ -29,8 +29,6 @@ typedef struct
 
 int read_options(int argc, char **argv, data_cache *data);
 
-void initHeader(dns_header *dns);
-
 int switchToTCP(int fd, const struct sockaddr *dest, unsigned char *packet, int length);
 
 void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int length);
