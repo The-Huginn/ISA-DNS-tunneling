@@ -17,11 +17,42 @@
 #include "../helpers/dnsUtils.h"
 
 /**
+ * @returns DNS server address otherwise DEFAULT_NONE if there is a problem getting default DNS server 
+ */
+uint32_t getDNSServer()
+{
+    FILE *fp;
+    char line[200] , *p;
+    if((fp = fopen("/etc/resolv.conf" , "r")) == NULL) {
+        fprintf(stderr, "Failed opening /etc/resolv.conf file \n");
+        return DEFAULT_NONE;
+    }
+     
+    while(fgets(line , 200 , fp)) {
+        if(line[0] == '#') {
+            continue;
+        }
+        if(strncmp(line , "nameserver" , 10) == 0) {
+            p = strtok(line , " ");
+            p = strtok(NULL , " ");
+            printf("%s", p);
+            return inet_addr(p);
+        }
+    }
+
+    return DEFAULT_NONE;
+}
+
+/**
  * @brief Tries to resolve tunnel provided by host name
  */
 int resolveTunnel(int fd, data_cache *data, unsigned char *packet, int length, struct sockaddr_in *dest) {
+    in_addr_t dnsServer = (in_addr_t)getDNSServer();
+    if (dnsServer == DEFAULT_NONE)
+        return false;
+
+    dest->sin_addr.s_addr = dnsServer;
     unsigned char buffer[MTU] = {'\0'};
-    dest->sin_addr.s_addr = (in_addr_t)data->ipv4;
 
     if (sendto(fd, (char *)packet, length, 0, (const struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0)
     {
@@ -131,31 +162,6 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
     return true;
 }
 
-int getDNSServer(data_cache *data)
-{
-    FILE *fp;
-    char line[200] , *p;
-    if((fp = fopen("/etc/resolv.conf" , "r")) == NULL) {
-        fprintf(stderr, "Failed opening /etc/resolv.conf file \n");
-        return false;
-    }
-     
-    while(fgets(line , 200 , fp)) {
-        if(line[0] == '#') {
-            continue;
-        }
-        if(strncmp(line , "nameserver" , 10) == 0) {
-            p = strtok(line , " ");
-            p = strtok(NULL , " ");
-            printf("%s", p);
-            data->ipv4 = inet_addr(p);
-            return true;
-        }
-    }
-
-    return false;
-}
-
 int main(int argc, char *argv[]) {
     // Initialization
     data_cache data;
@@ -188,11 +194,8 @@ int main(int argc, char *argv[]) {
     }
 
     if (data.ipv4 == DEFAULT_NONE)
-        if (!getDNSServer(&data))   // get DNS server for resolution
+        if (!resolveTunnel(fd, &data, packet, HEADER_SIZE + strlen((const char *)qname) + 1 + sizeof(question), &dest)) // resolve custom DNS server
             return -1;
-        else
-            if (!resolveTunnel(fd, &data, packet, HEADER_SIZE + strlen((const char *)qname) + 1 + sizeof(question), &dest)) // resolve custom DNS server
-                return -1;
 
     // Execution
     if (!sendIPv4(fd, &data, packet, HEADER_SIZE + strlen((const char *)qname) + 1 + sizeof(question), &dest))
