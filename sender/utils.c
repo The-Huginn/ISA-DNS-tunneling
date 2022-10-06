@@ -91,7 +91,7 @@ int switchToTCP(int fd, const struct sockaddr *dest, unsigned char *packet, int 
     return true;
 }
 
-void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int length) {
+void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int length, int proto) {
     memcpy(&packet[dns_length], payload, length);
 }
 

@@ -124,15 +124,17 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
     dest->sin_addr.s_addr = (in_addr_t)data->ipv4;
 
     // max_len can be without the packet header and destination file name transfered via UDP (only for the first packet)
-    int init = true, max_len = UDP_MTU - length - strlen(data->dst_file) + 1, msg_size;
+    appendFileName(packet, length, data->dst_file);
+    int init = true,
+        max_len = UDP_MTU - length - strlen(data->dst_file) + 1, msg_size;
+
     while ((msg_size = fread(payload, 1, max_len, data->src_file)) > 0)
     {
-
+        fprintf(stderr, "%d\n", msg_size);
         // send UDP
         if (init && msg_size < max_len)
         {
-            appendFileName(packet, length, data->dst_file);
-            appendMessage(packet, length + strlen(data->dst_file) + 1, payload, msg_size);
+            appendMessage(packet, length + strlen(data->dst_file) + 1, payload, msg_size, OPEN_UDP);
             if (sendto(fd, packet, length + strlen(data->dst_file) + 1 + msg_size, 0, (const struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0)
             {
                 perror("sendto failed");
@@ -143,8 +145,7 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         else if (init)
         { // send one UDP to inform about TCP, still sends name of the file
             init = false;
-            appendFileName(packet, length, data->dst_file);
-            max_len = TCP_MTU - length;
+            max_len = TCP_MTU - length - 2; // -2 for 2 bytes for lenght of TCP
 
             ((dns_header *)packet)->q_count = htons(2);
 
@@ -153,13 +154,13 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
                 perror("Failed to send message to require TCP connection\n");
                 return false;
             }
-
-            if (!switchToTCP(fd, (const struct sockaddr *)dest, packet, length))
-                return false;
         }
 
+        if (!switchToTCP(fd, (const struct sockaddr *)dest, packet, length))
+            return false;
+
         // TCP communication
-        appendMessage(packet, length, payload, msg_size);
+        appendMessage(packet, length, payload, msg_size, OPEN_TCP);
         int i;
         if ((i = write(fd, packet, length + msg_size)) == -1)
         {
@@ -169,6 +170,28 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         else if (i != length + msg_size)
         {
             perror("unable to write() whole message\n");
+            return false;
+        }
+    }
+
+    // End communication
+    if (!init)
+    {
+        if (!switchToTCP(fd, (const struct sockaddr *)dest, packet, length))
+            return false;
+
+        // Let TCP know, we finished
+        ((dns_header *)packet)->q_count = htons(1);
+
+        int i;
+        if ((i = write(fd, packet, length + msg_size)) == -1)
+        {
+            perror("unable to write() last TCP packet\n");
+            return false;
+        }
+        else if (i != length + msg_size)
+        {
+            perror("unable to write() whole message of the last TCP packet\n");
             return false;
         }
     }
@@ -190,7 +213,7 @@ int main(int argc, char *argv[])
     memset(data.host, '\0', sizeof(data.host));
 
     dest.sin_family = AF_INET;
-    dest.sin_port = htons(5556); // set the server port (network byte order)
+    dest.sin_port = htons(5558); // set the server port (network byte order)
 
     if (read_options(argc, argv, &data) == false)
         return -1;
