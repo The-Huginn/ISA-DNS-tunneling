@@ -42,7 +42,7 @@ int serverTCP(struct sockaddr_in *server)
     struct sockaddr_in from;
     int newSock, msg_len;
     socklen_t len = sizeof(from);
-    char buffer[TCP_MTU];
+    unsigned char buffer[TCP_MTU];
 
     while (true)
     {
@@ -55,43 +55,36 @@ int serverTCP(struct sockaddr_in *server)
         int total = 0;
         int current = 1; // cant be same as total
 
-        while (msg_len = read(newSock, buffer, TCP_MTU) > 0) {
-            fprintf(stderr, "%d\n", msg_len);
+        while (total != current)
+        {
+
+            // reading message
+            if ((msg_len = read(newSock, buffer, TCP_MTU)) < 0)
+            {
+                fprintf(stderr, "Unable to read from TCP stream\n");
+                return false;
+            }
+
+            unsigned char *payload = readPayload(buffer, &msg_len, total == 0);
+
+            // first packet
+            if (total == 0)
+            {
+                current = 0;
+                total = *((uint16_t*)payload);
+                payload += 2;
+            }
+            current += msg_len;
+
+            for (int i = 0; i < msg_len; i++)
+            {
+                if (fputc(payload[i], output) == EOF)
+                {
+                    fprintf(stderr, "Problem writing into file\n");
+                    return false;
+                }
+            }
         }
-
-        // while (total != current)
-        // {
-
-        //     // reading message
-        //     if ((msg_len = read(newSock, buffer, TCP_MTU)) < 0)
-        //     {
-        //         fprintf(stderr, "Unable to read from TCP stream\n");
-        //         return false;
-        //     }
-
-        //     unsigned char *payload = readPayload(buffer, &msg_len);
-
-        //     // first packet
-        //     if (total == 0)
-        //     {
-        //         current = 0;
-        //         total = *((uint16_t *)payload);
-        //         payload += 2;
-        //     }
-        //     current += msg_len;
-
-        //     if (msg_len != 0)
-        //         fprintf(stderr, "%d %d %d\n", msg_len, total, current);
-
-        //     for (int i = 0; i < msg_len; i++)
-        //     {
-        //         if (fputc(payload[i], output) == EOF)
-        //         {
-        //             fprintf(stderr, "Problem writing into file\n");
-        //             return false;
-        //         }
-        //     }
-        // }
 
         close(newSock);
 
@@ -126,7 +119,7 @@ int serverUDP(struct sockaddr_in *server, char **argv)
         if (!openFile(path, buffer))
             strcpy(returnCode, "unable to open file");
 
-        unsigned char *payload = readPayload(buffer, &msg_size);
+        unsigned char *payload = readPayload(buffer, &msg_size, true);
         unsigned char *qname = &buffer[HEADER_SIZE]; // skip header and point to first qname
 
         // checks if TCP is needed, otherwise writes data here
@@ -169,7 +162,7 @@ int main(int argc, char **argv)
     struct sockaddr_in server;
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = htonl(INADDR_ANY);
-    server.sin_port = htons(5558);
+    server.sin_port = htons(5557);
 
     signal(SIGINT, my_handler);
 

@@ -64,19 +64,25 @@ int openTCP(struct sockaddr *server)
     return true;
 }
 
-unsigned char *readPayload(unsigned char *buffer, int *msg_size)
+unsigned char *readPayload(unsigned char *buffer, int *msg_size, int first)
 {
-    unsigned char qname[STRING_SIZE + 1] = {'\0'}, file[STRING_SIZE + 1] = {'\0'};
+    if (first == false)
+        return buffer;
+
+    unsigned char qname[STRING_SIZE + 1] = {'\0'};
     // copy qname
     strcpy(qname, &buffer[HEADER_SIZE]);
+    int length = HEADER_SIZE;
+    length += strlen(qname) + 1;
 
-    unsigned char *payload = &buffer[HEADER_SIZE + strlen(qname) + 1 + sizeof(question)];
+    length += sizeof(question);
+    unsigned char *payload = &buffer[length];
 
-    payload = &payload[strlen(file) + 1];
-    msg_size -= (unsigned char *)buffer - (unsigned char *)payload;
-    // msg_size -= HEADER_SIZE + strlen(qname) + 1 + sizeof(question) + strlen(file) + 1;
+    payload = &payload[strlen(&buffer[length]) + 1];    // skip file name
+    length += strlen(&buffer[length]) + 1;
+    *msg_size -= length;
 
-    return payload;
+    return &buffer[length];
 }
 
 int openFile(unsigned char *path, unsigned char *buffer)
