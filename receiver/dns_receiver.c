@@ -22,7 +22,8 @@
 #include "utils.h"
 #include "../helpers/dnsUtils.h"
 
-int fd;
+int udp;
+int tcp;
 FILE *output = NULL;
 
 void my_handler(int s)
@@ -31,33 +32,13 @@ void my_handler(int s)
     if (output != NULL)
         fclose(output);
 
-    close(fd);
+    close(udp);
+    close(tcp);
     exit(0);
 }
 
 int serverTCP(struct sockaddr_in *server)
 {
-    close(fd);
-
-    if ((fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1)
-    {
-        fprintf(stderr, "socket(): could not create the socket\n");
-        return false;
-    }
-
-    if (bind(fd, (struct sockaddr *)server, sizeof(struct sockaddr_in)) < 0)
-    {
-        err(1, "help");
-        fprintf(stderr, "TCP binding failed'n");
-        return false;
-    }
-
-    if (listen(fd, 1) == -1)
-    {
-        fprintf(stderr, "TCP listen failed\n");
-        return false;
-    }
-
     struct sockaddr_in from;
     int newSock, msg_len;
     socklen_t len = sizeof(from);
@@ -65,34 +46,60 @@ int serverTCP(struct sockaddr_in *server)
 
     while (true)
     {
-        if ((newSock = accept(fd, (struct sockaddr *)&from, &len)) == -1)
+        if ((newSock = accept(tcp, (struct sockaddr *)&from, &len)) == -1)
         {
-            err(1, "help");
             fprintf(stderr, "accept failed\n");
             return false;
         }
 
-        // reading message
-        if ((msg_len = read(newSock, buffer, TCP_MTU)) < 0)
-        {
-            fprintf(stderr, "Unable to read from TCP stream\n");
-            return false;
+        int total = 0;
+        int current = 1; // cant be same as total
+
+        while (msg_len = read(newSock, buffer, TCP_MTU) > 0) {
+            fprintf(stderr, "%d\n", msg_len);
         }
 
-        for (int i = 0; i < msg_len; i++)
-        {
-            if (fputc(buffer[i], output) == EOF)
-            {
-                fprintf(stderr, "Problem writing into file\n");
-                return false;
-            }
-        }
+        // while (total != current)
+        // {
+
+        //     // reading message
+        //     if ((msg_len = read(newSock, buffer, TCP_MTU)) < 0)
+        //     {
+        //         fprintf(stderr, "Unable to read from TCP stream\n");
+        //         return false;
+        //     }
+
+        //     unsigned char *payload = readPayload(buffer, &msg_len);
+
+        //     // first packet
+        //     if (total == 0)
+        //     {
+        //         current = 0;
+        //         total = *((uint16_t *)payload);
+        //         payload += 2;
+        //     }
+        //     current += msg_len;
+
+        //     if (msg_len != 0)
+        //         fprintf(stderr, "%d %d %d\n", msg_len, total, current);
+
+        //     for (int i = 0; i < msg_len; i++)
+        //     {
+        //         if (fputc(payload[i], output) == EOF)
+        //         {
+        //             fprintf(stderr, "Problem writing into file\n");
+        //             return false;
+        //         }
+        //     }
+        // }
+
+        close(newSock);
 
         // last packet received
         if (checkProto((dns_header *)buffer, OPEN_UDP))
         {
-            close(fd);
-            return openUDP((struct sockaddr *)server);
+            fprintf(stderr, "Last packet received, listening on UDP again\n");
+            return true;
         }
     }
 
@@ -109,44 +116,21 @@ int serverUDP(struct sockaddr_in *server, char **argv)
     struct sockaddr_in client;
     socklen_t length;
 
-    if (!openUDP((struct sockaddr *)server))
-        return false;
-
     length = sizeof(client);
 
-    while ((msg_size = recvfrom(fd, buffer, UDP_MTU, 0, (struct sockaddr *)&client, &length)) >= 0)
+    while ((msg_size = recvfrom(udp, buffer, UDP_MTU, 0, (struct sockaddr *)&client, &length)) >= 0)
     {
-        unsigned char qname[STRING_SIZE + 1] = {'\0'}, file[STRING_SIZE + 1] = {'\0'};
         fprintf(stderr, "Server received packet\n");
         unsigned char returnCode[RETURN_CODE] = "OK\0";
 
-        // copy qname
-        strcpy(qname, &buffer[HEADER_SIZE]);
-
-        // skip header and qname
-        unsigned char *payload = &buffer[HEADER_SIZE + strlen(qname) + 1 + sizeof(question)];
-
-        // read file name
-        strcpy(file, payload);
-        payload = &payload[strlen(file) + 1];
-        // Should work, rather check TODO
-        msg_size -= (unsigned char*)buffer - (unsigned char*)payload;
-        // msg_size -= HEADER_SIZE + strlen(qname) + 1 + sizeof(question) + strlen(file) + 1;
-
-        // open file
-        unsigned char *fullPath = (unsigned char *)malloc(strlen(path) + strlen(file) + 1);
-        memset(fullPath, '\0', strlen(path) + strlen(file) + 1);
-        strcpy(fullPath, path);
-        strcpy(&fullPath[strlen(path)], file);
-
-        if ((output = fopen(fullPath, "w")) == NULL)
-        {
-            fprintf(stderr, "Unable to open file [%s]\n", fullPath);
+        if (!openFile(path, buffer))
             strcpy(returnCode, "unable to open file");
-        }
+
+        unsigned char *payload = readPayload(buffer, &msg_size);
+        unsigned char *qname = &buffer[HEADER_SIZE]; // skip header and point to first qname
 
         // checks if TCP is needed, otherwise writes data here
-        if (checkProto((dns_header*)buffer, OPEN_TCP))
+        if (checkProto((dns_header *)buffer, OPEN_TCP))
         { // TCP needed
             fprintf(stderr, "TCP connection needed\n");
             if (!serverTCP(server))
@@ -167,7 +151,7 @@ int serverUDP(struct sockaddr_in *server, char **argv)
 
         fclose(output);
         // send a reply
-        sendReply(fd, returnCode, qname, (struct sockaddr*)&client);
+        sendReply(udp, returnCode, qname, (struct sockaddr *)&client);
     }
 
     return true;
@@ -185,15 +169,19 @@ int main(int argc, char **argv)
     struct sockaddr_in server;
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = htonl(INADDR_ANY);
-    server.sin_port = htons(PORT);
+    server.sin_port = htons(5558);
 
     signal(SIGINT, my_handler);
+
+    if (!openUDP((struct sockaddr *)&server) || !openTCP((struct sockaddr *)&server))
+        return -1;
 
     serverUDP(&server, argv);
 
     // dead code
     fclose(output);
-    close(fd);
+    close(udp);
+    close(tcp);
 
     return -1;
 }
