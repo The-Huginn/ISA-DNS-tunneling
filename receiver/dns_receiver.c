@@ -121,9 +121,11 @@ int serverUDP(struct sockaddr_in *server, char **argv)
     while ((msg_size = recvfrom(udp, buffer, UDP_MTU, 0, (struct sockaddr *)&client, &length)) >= 0)
     {
         fprintf(stderr, "Server received packet\n");
-        unsigned char returnCode[RETURN_CODE] = "OK\0";
+        unsigned char returnCode[RETURN_CODE] = "received request\0";
         unsigned char *payload = readPayload(buffer, &msg_size, true);
         unsigned char *qname = &buffer[HEADER_SIZE]; // skip header and point to first qname
+
+        sendReply(udp, returnCode, qname, (struct sockaddr*)&client);
 
         // unable to open file, just send a reply
         if (!openFile(path, buffer))
@@ -156,6 +158,7 @@ int serverUDP(struct sockaddr_in *server, char **argv)
         fclose(output);
         output = NULL;
         // send a reply
+        strcpy(returnCode, "OK");
         sendReply(udp, returnCode, qname, (struct sockaddr *)&client);
 
         fprintf(stderr, "Transfer finished, waiting for new client\n");
