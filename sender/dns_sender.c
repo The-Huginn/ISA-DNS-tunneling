@@ -177,7 +177,10 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         // send UDP
         if (init && msg_size < max_len)
         {
-            appendMessage(packet, length, payload, &msg_size);
+            appendMessage(packet, length, payload, msg_size);
+            if (encode)
+                encode(&packet[length], msg_size);
+
             dns_sender__on_chunk_encoded(data->dst_file, chunk, data->host);
 
             if (sendto(fd, packet, length + msg_size, 0, (const struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0)
@@ -210,6 +213,9 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
             ((dns_header *)packet)->q_count = htons(1); // last packet
 
         appendMessage(packet, length, payload, &msg_size);
+        if (encode)
+                encode(&packet[length], msg_size);
+                
         dns_sender__on_chunk_encoded(data->dst_file, chunk, data->host);
 
         int i;
@@ -256,10 +262,10 @@ int main(int argc, char *argv[])
     dest.sin_family = AF_INET;
     dest.sin_port = htons(5556); // set the server port (network byte order)
 
-    int length = createQuery(packet, data.host);
-
     if (read_options(argc, argv, &data) == false)
         return -1;
+
+    int length = createQuery(packet, data.host);
 
     if ((fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
     {

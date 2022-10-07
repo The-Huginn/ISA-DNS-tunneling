@@ -92,7 +92,7 @@ void initHeader(dns_header *dns)
 // we check for a dot and if missing we skip this method
 void ChangetoDnsNameFormat(unsigned char *dns, unsigned char *host)
 {
-    if (strchr(dns, '.') == NULL)
+    if (strchr(host, '.') == NULL)
         return;
 
     int lock = 0, i;
@@ -113,10 +113,13 @@ void ChangetoDnsNameFormat(unsigned char *dns, unsigned char *host)
     *dns++ = '\0';
 }
 
-int sendReply(int fd, unsigned char* packet, int dns_length, struct sockaddr* client, unsigned char* returnCode)
+int sendReply(int fd, unsigned char* packet, int dns_length, struct sockaddr* client, unsigned char* returnCode, int encoding)
 {
     int length = strlen(returnCode), msg_len;
     appendMessage(packet, dns_length, returnCode, &length);
+
+    if (encoding)
+        encode(&packet[dns_length], length);
 
     if ((msg_len = sendto(fd, packet, length, 0, client, sizeof(struct sockaddr_in))) == -1) {
         fprintf(stderr, "Failed to send reply to client\n");
@@ -226,14 +229,13 @@ void decode(unsigned char* payload, int length)
     }
 }
 
-void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int *length)
+void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int length)
 {
-    changeLength(packet, dns_length, *length);
+    changeLength(packet, dns_length, length);
 
     packet = &packet[dns_length];
 
-    memcpy(packet, payload, *length);
-    encode(packet, *length);
+    memcpy(packet, payload, length);
 }
 
 void appendFileName(unsigned char *packet, int dns_length, const unsigned char *file)

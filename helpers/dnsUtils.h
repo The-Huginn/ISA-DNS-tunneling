@@ -30,7 +30,7 @@ void ChangetoDnsNameFormat(unsigned char *dns, unsigned char* host);
 
 void initHeader(dns_header *dns);
 
-int sendReply(int fd, unsigned char* packet, int dns_length, struct sockaddr* client, unsigned char* returnCode);
+int sendReply(int fd, unsigned char* packet, int dns_length, struct sockaddr* client, unsigned char* returnCode, int encoding);
 
 unsigned char* readPayload(unsigned char* packet, int *msg_size, int first);
 
@@ -53,7 +53,7 @@ void encode(unsigned char* payload, int length);
 
 void decode(unsigned char* payload, int length);
 
-void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int* length);
+void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int length);
 
 void appendFileName(unsigned char *packet, int dns_length, const unsigned char *);
 

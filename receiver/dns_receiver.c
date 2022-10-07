@@ -42,7 +42,7 @@ void my_handler(int s)
     exit(0);
 }
 
-int serverTCP(struct sockaddr_in *server, int decoding)
+int serverTCP(struct sockaddr_in *server, int encoding)
 {
     struct sockaddr_in from;
     int newSock, msg_len;
@@ -92,7 +92,7 @@ int serverTCP(struct sockaddr_in *server, int decoding)
             }
             current += msg_len;
 
-            if (decoding)
+            if (encoding)
                 decode(payload, msg_len);
             
             for (int i = 0; i < msg_len; i++)
@@ -119,7 +119,7 @@ int serverTCP(struct sockaddr_in *server, int decoding)
     return true;
 }
 
-int serverUDP(struct sockaddr_in *server, char **argv, int decoding)
+int serverUDP(struct sockaddr_in *server, char **argv, int encoding)
 {
 
     unsigned char *path = argv[2];
@@ -146,13 +146,13 @@ int serverUDP(struct sockaddr_in *server, char **argv, int decoding)
         memcpy(reply, buffer, headerLength);
         unsigned char *qname = &buffer[HEADER_SIZE]; // skip header and point to first qname
 
-        sendReply(udp, reply, headerLength, (struct sockaddr *)&client, returnCode);
+        sendReply(udp, reply, headerLength, (struct sockaddr *)&client, returnCode, encoding);
 
         // unable to open file, just send a reply
         if (!openFile(path, &payload))
         {
             strcpy(returnCode, "unable to open file");
-            sendReply(udp, reply, headerLength, (struct sockaddr *)&client, returnCode);
+            sendReply(udp, reply, headerLength, (struct sockaddr *)&client, returnCode, encoding);
             continue;
         }
 
@@ -160,14 +160,14 @@ int serverUDP(struct sockaddr_in *server, char **argv, int decoding)
         if (checkProto((dns_header *)buffer, OPEN_TCP))
         { // TCP needed
             fprintf(stderr, "TCP connection needed\n");
-            if (!serverTCP(server, decoding))
+            if (!serverTCP(server, encoding))
                 strcpy(returnCode, "TCP transfer failed");
         }
         else
         { // all payload in current UDP packet
             fprintf(stderr, "UDP connection sufficient\n");
             
-            if (decoding)
+            if (encoding)
                 decode(payload, msg_size);
                 
             for (int i = 0; i < msg_size; i++)
@@ -184,7 +184,7 @@ int serverUDP(struct sockaddr_in *server, char **argv, int decoding)
         output = NULL;
         // send a reply
         strcpy(returnCode, "OK");
-        sendReply(udp, reply, headerLength, (struct sockaddr *)&client, returnCode);
+        sendReply(udp, reply, headerLength, (struct sockaddr *)&client, returnCode, encoding);
 
         fprintf(stderr, "Transfer finished, waiting for new client\n");
     }
@@ -201,7 +201,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    int c, decoding = true;
+    int c, encoding = true;
     opterr = 0;
     while ((c = getopt(argc, argv, "d")) != -1)
     {
@@ -209,7 +209,7 @@ int main(int argc, char **argv)
         switch (c)
         {
             case 'd':
-                decoding = false;
+                encoding = false;
                 break;
         }
     }
@@ -224,7 +224,7 @@ int main(int argc, char **argv)
     if (!openUDP((struct sockaddr *)&server) || !openTCP((struct sockaddr *)&server))
         return -1;
 
-    serverUDP(&server, argv, decoding);
+    serverUDP(&server, argv, encoding);
 
     // dead code
     fclose(output);
