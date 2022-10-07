@@ -16,6 +16,7 @@
 #include "dns_sender.h"
 #include "utils.h"
 #include "../helpers/dnsUtils.h"
+#include "dns_sender_events.h"
 
 pid_t child = 0;
 int fd;
@@ -140,6 +141,8 @@ int resolveTunnel(int fd, data_cache *data, unsigned char *packet, int length, s
 
 int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct sockaddr_in *dest)
 {
+    dns_sender__on_transfer_init(dest);
+
     unsigned char payload[TCP_MTU] = {'\0'};
     dest->sin_addr.s_addr = (in_addr_t)data->ipv4;
 
@@ -165,17 +168,23 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         child = pid;
     }
 
+    int totalSize = 0;
+    int chunk = -1;
     while ((msg_size = fread(payload, 1, max_len, data->src_file)) > 0)
     {
+        totalSize += msg_size;
+        chunk++;
         // send UDP
         if (init && msg_size < max_len)
         {
             appendMessage(packet, length, payload, &msg_size, OPEN_UDP);
+            dns_sender__on_chunk_encoded(dest, data->dst_file, chunk);
             if (sendto(fd, packet, length + msg_size, 0, (const struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0)
             {
                 perror("sendto failed");
                 return false;
             }
+            dns_sender__on_chunk_sent(dest, data->dst_file, chunk, msg_size);
             return true;
         }
         else if (init)
@@ -199,6 +208,7 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
             ((dns_header *)packet)->q_count = htons(1); // last packet
 
         appendMessage(packet, length, payload, &msg_size, OPEN_TCP);
+        dns_sender__on_chunk_encoded(dest, data->dst_file, chunk);
         int i;
         // fprintf(stderr, "Last char: %d\n", packet[length + msg_size - 1]);
 
@@ -213,10 +223,12 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
             perror("unable to write() whole message\n");
             return false;
         }
+        dns_sender__on_chunk_sent(dest, data->dst_file, chunk, msg_size);
 
         max_len = TCP_MTU - length - 2; // -2 for 2 bytes for lenght of TCP
     }
 
+    dns_sender__on_transfer_completed(data->dst_file, totalSize);
     close(fd);
 
     return true;
