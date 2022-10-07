@@ -115,17 +115,17 @@ void ChangetoDnsNameFormat(unsigned char *dns, unsigned char *host)
 
 int sendReply(int fd, unsigned char* packet, int dns_length, struct sockaddr* client, unsigned char* returnCode, int encoding)
 {
-    int length = strlen(returnCode), msg_len;
+    int length = strlen(returnCode) + 1, msg_len;
     appendMessage(packet, dns_length, returnCode, 0, length);
 
     if (encoding)
         encode(&packet[dns_length], length);
 
-    if ((msg_len = sendto(fd, packet, length, 0, client, sizeof(struct sockaddr_in))) == -1) {
+    if ((msg_len = sendto(fd, packet, dns_length + length, 0, client, sizeof(struct sockaddr_in))) == -1) {
         fprintf(stderr, "Failed to send reply to client\n");
         return false;
     }
-    if (msg_len != length) {
+    if (msg_len != dns_length + length) {
         fprintf(stderr, "Not full message sent to client\n");
         return false;
     }

@@ -96,7 +96,7 @@ int serverTCP(struct sockaddr_in *server, int encoding)
 
             if (encoding)
                 decode(payload, msg_len);
-            
+
             for (int i = 0; i < msg_len; i++)
             {
                 if (fputc(payload[i], output) == EOF)
@@ -128,7 +128,7 @@ int serverUDP(struct sockaddr_in *server, char **argv, int argStart, int encodin
     unsigned char *path = argv[argStart + 1];
 
     int msg_size, i;
-    char buffer[UDP_MTU];
+    unsigned char buffer[UDP_MTU];
     struct sockaddr_in client;
     socklen_t length;
 
@@ -140,20 +140,20 @@ int serverUDP(struct sockaddr_in *server, char **argv, int argStart, int encodin
         fprintf(stderr, "Server received packet\n");
 
         unsigned char reply[UDP_MTU];
-        int headerLength = msg_size;
 
-        unsigned char returnCode[RETURN_CODE] = "received request\0";
+        unsigned char returnCode[RETURN_CODE] = "received request";
         unsigned char *payload = readPayload(buffer, &msg_size, true);
-        headerLength -= msg_size;
+        int headerLength = payload - buffer;
 
         memcpy(reply, buffer, headerLength);
+
         unsigned char *qname = &buffer[HEADER_SIZE]; // skip header and point to first qname
 
         if (strcmp(qname, host) != 0)
         {
             fprintf(stderr, "Host name does not match\n");
             strcpy(returnCode, "Host name does not match");
-            sendReply(udp, reply, headerLength, (struct sockaddr*)&client, returnCode, encoding);
+            sendReply(udp, reply, headerLength, (struct sockaddr *)&client, returnCode, encoding);
             continue;
         }
 
@@ -178,10 +178,10 @@ int serverUDP(struct sockaddr_in *server, char **argv, int argStart, int encodin
         else
         { // all payload in current UDP packet
             fprintf(stderr, "UDP connection sufficient\n");
-            
+
             if (encoding)
                 decode(payload, msg_size);
-                
+
             for (int i = 0; i < msg_size; i++)
             {
                 if (fputc(payload[i], output) == EOF)
@@ -195,7 +195,7 @@ int serverUDP(struct sockaddr_in *server, char **argv, int argStart, int encodin
         fclose(output);
         output = NULL;
         // send a reply
-        strcpy(returnCode, "OK");
+        strcpy(returnCode, "All good");
         sendReply(udp, reply, headerLength, (struct sockaddr *)&client, returnCode, encoding);
 
         fprintf(stderr, "Transfer finished, waiting for new client\n");
@@ -213,13 +213,13 @@ int main(int argc, char **argv)
 
         switch (c)
         {
-            case 'd':
-                encoding = false;
-                break;
+        case 'd':
+            encoding = false;
+            break;
         }
     }
 
-    if (optind < 2 || optind >= argc)
+    if (optind < 1 || optind >= argc)
     {
         fprintf(stderr, "Missing arguments\n");
         return -1;
