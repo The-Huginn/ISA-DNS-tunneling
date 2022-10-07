@@ -21,6 +21,9 @@
 #define OPEN_TCP 2
 #define RETURN_CODE 50
 
+#define SEED 'A'
+#define BYTE 256
+
 u_char *ReadName(unsigned char *reader, unsigned char *buffer, int *count);
 
 void ChangetoDnsNameFormat(unsigned char *dns, unsigned char* host);
@@ -33,5 +36,9 @@ int sendReply(int fd, unsigned char* returnCode, unsigned char* qname, struct so
  * @return true upon proto being the same as q_count
  */
 int checkProto(dns_header* dns, int proto);
+
+void encode(unsigned char* payload, int length);
+
+void decode(unsigned char* payload, int length);
 
 #endif // !__DNSUTILS__

@@ -84,6 +84,7 @@ unsigned char *readPayload(unsigned char *buffer, int *msg_size, int first, int 
     if (proto == OPEN_TCP)    // we do not consider +2 for payload
         *msg_size -= 2;
 
+    decode(&buffer[length], *msg_size);
     return &buffer[length];
 }
 

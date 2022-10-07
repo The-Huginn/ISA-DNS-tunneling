@@ -146,3 +146,21 @@ int checkProto(dns_header *dns, int proto)
 {
     return ntohs(dns->q_count) == proto;
 }
+
+void encode(unsigned char* payload, int length)
+{
+    for (int i = 0; i < length; i++)
+    {
+        int c = payload[i];
+        payload[i] = (c + SEED) % BYTE;
+    }
+}
+
+void decode(unsigned char* payload, int length)
+{
+    for (int i = 0; i < length; i++)
+    {
+        int c = payload[i];
+        payload[i] = (c + BYTE - SEED) % BYTE;
+    }
+}

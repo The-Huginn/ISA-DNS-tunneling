@@ -100,6 +100,7 @@ void appendMessage(unsigned char *packet, int dns_length, const unsigned char *p
     }
 
     memcpy(packet, payload, *length);
+    encode(packet, *length);
 
     if (proto == OPEN_TCP)
         *length += 2;   // 2 bytes for TCP length
