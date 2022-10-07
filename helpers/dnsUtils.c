@@ -196,19 +196,19 @@ void createRData(r_data* rData, int length)
     rData->type = ntohs(T_A);
     rData->_class = ntohs(IN);
     rData->ttl = ntohl(14400);
-    rData->data_len = ntohl(length);
+    rData->data_len = ntohs(length);
 }
 
 void changeLength(unsigned char* packet, int queryLength, int newLength)
 {
     r_data *rData = (r_data*)&packet[queryLength - sizeof(r_data)];
-    rData->data_len = ntohl(newLength);
+    rData->data_len = ntohs(newLength);
 }
 
 int getLength(unsigned char* packet, int queryLength)
 {
     r_data *rData = (r_data*)&packet[queryLength - sizeof(r_data)];
-    return htonl(rData->data_len);
+    return ntohs(rData->data_len);
 }
 
 void encode(unsigned char* payload, int length)

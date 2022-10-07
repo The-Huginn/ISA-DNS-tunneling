@@ -260,7 +260,7 @@ int main(int argc, char *argv[])
     data.encode = true;
 
     dest.sin_family = AF_INET;
-    dest.sin_port = htons(5556); // set the server port (network byte order)
+    dest.sin_port = htons(5557); // set the server port (network byte order)
 
     if (read_options(argc, argv, &data) == false)
         return -1;
