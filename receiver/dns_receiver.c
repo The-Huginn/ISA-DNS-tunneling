@@ -70,7 +70,7 @@ int serverTCP(struct sockaddr_in *server)
             if (checkProto((dns_header *)buffer, OPEN_UDP))
                 last = true;
 
-            unsigned char *payload = readPayload(buffer, &msg_len, total == 0);
+            unsigned char *payload = readPayload(buffer, &msg_len, total == 0, OPEN_TCP);
 
             // first packet
             if (total == 0)
@@ -122,7 +122,7 @@ int serverUDP(struct sockaddr_in *server, char **argv)
     {
         fprintf(stderr, "Server received packet\n");
         unsigned char returnCode[RETURN_CODE] = "received request\0";
-        unsigned char *payload = readPayload(buffer, &msg_size, true);
+        unsigned char *payload = readPayload(buffer, &msg_size, true, OPEN_UDP);
         unsigned char *qname = &buffer[HEADER_SIZE]; // skip header and point to first qname
 
         sendReply(udp, returnCode, qname, (struct sockaddr*)&client);
