@@ -53,7 +53,7 @@ void encode(unsigned char* payload, int length);
 
 void decode(unsigned char* payload, int length);
 
-void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int length);
+void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int skip, int length);
 
 void appendFileName(unsigned char *packet, int dns_length, const unsigned char *);
 

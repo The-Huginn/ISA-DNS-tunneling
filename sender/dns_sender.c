@@ -177,7 +177,7 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         // send UDP
         if (init && msg_size < max_len)
         {
-            appendMessage(packet, length - (strlen(data->dst_file) + 1), payload, msg_size);
+            appendMessage(packet, length - (strlen(data->dst_file) + 1), payload, strlen(data->dst_file) + 1, msg_size);
             if (data->encode)
                 encode(&packet[length], msg_size);
 
@@ -212,7 +212,7 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         if (msg_size != max_len)
             ((dns_header *)packet)->q_count = htons(1); // last packet
 
-        appendMessage(packet, length - (strlen(data->dst_file) + 1), payload, msg_size);
+        appendMessage(packet, length - (strlen(data->dst_file) + 1), payload, strlen(data->dst_file) + 1, msg_size);
         if (data->encode)
                 encode(&packet[length], msg_size);
 
@@ -260,7 +260,7 @@ int main(int argc, char *argv[])
     data.encode = true;
 
     dest.sin_family = AF_INET;
-    dest.sin_port = htons(5557); // set the server port (network byte order)
+    dest.sin_port = htons(5558); // set the server port (network byte order)
 
     if (read_options(argc, argv, &data) == false)
         return -1;
@@ -278,8 +278,10 @@ int main(int argc, char *argv[])
             return -1;
 
     length = addResource(packet, length);
+    fprintf(stderr, "%d\n", length);
     appendFileName(packet, length, data.dst_file);
     length += strlen(data.dst_file) + 1;
+    fprintf(stderr, "%d\n", length);
 
     // Execution
     if (!sendIPv4(fd, &data, packet, length, &dest))

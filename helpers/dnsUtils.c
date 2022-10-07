@@ -116,7 +116,7 @@ void ChangetoDnsNameFormat(unsigned char *dns, unsigned char *host)
 int sendReply(int fd, unsigned char* packet, int dns_length, struct sockaddr* client, unsigned char* returnCode, int encoding)
 {
     int length = strlen(returnCode), msg_len;
-    appendMessage(packet, dns_length, returnCode, length);
+    appendMessage(packet, dns_length, returnCode, 0, length);
 
     if (encoding)
         encode(&packet[dns_length], length);
@@ -228,11 +228,11 @@ void decode(unsigned char* payload, int length)
     }
 }
 
-void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int length)
+void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int skip, int length)
 {
     changeLength(packet, dns_length, length);
 
-    packet = &packet[dns_length];
+    packet = &packet[dns_length + skip];
 
     memcpy(packet, payload, length);
 }
