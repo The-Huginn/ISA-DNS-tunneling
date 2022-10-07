@@ -22,7 +22,7 @@ int openTCP(struct sockaddr* server);
  * @param payload 
  * @return actual start of payload
  */
-unsigned char * readPayload(unsigned char* buffer, int* msg_size, int first);
+unsigned char * readPayload(unsigned char* buffer, int* msg_size, int first, int proto);
 
 int openFile(unsigned char* path, unsigned char* buffer);
 

@@ -64,7 +64,7 @@ int openTCP(struct sockaddr *server)
     return true;
 }
 
-unsigned char *readPayload(unsigned char *buffer, int *msg_size, int first)
+unsigned char *readPayload(unsigned char *buffer, int *msg_size, int first, int proto)
 {
     if (first == false)
         return buffer;
@@ -80,7 +80,9 @@ unsigned char *readPayload(unsigned char *buffer, int *msg_size, int first)
 
     payload = &payload[strlen(&buffer[length]) + 1];    // skip file name
     length += strlen(&buffer[length]) + 1;
-    *msg_size -= (length + 2);    // we do not consider +2 for payload
+    *msg_size -= length;
+    if (proto == OPEN_TCP)    // we do not consider +2 for payload
+        *msg_size -= 2;
 
     return &buffer[length];
 }
