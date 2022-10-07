@@ -28,6 +28,7 @@ typedef struct
     char host[STRING_SIZE + 1];     // +1 for '\0'
     char dst_file[STRING_SIZE + 1]; // +1 for '\0'
     FILE *src_file;
+    int encode;
 } data_cache;
 
 int read_options(int argc, char **argv, data_cache *data);

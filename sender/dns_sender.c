@@ -251,6 +251,7 @@ int main(int argc, char *argv[])
     data.src_file = stdin;
     memset(data.dst_file, '\0', sizeof(data.dst_file));
     memset(data.host, '\0', sizeof(data.host));
+    data.encode = true;
 
     dest.sin_family = AF_INET;
     dest.sin_port = htons(5556); // set the server port (network byte order)

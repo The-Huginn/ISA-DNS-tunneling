@@ -15,7 +15,7 @@ int read_options(int argc, char **argv, data_cache *data)
     int c;
     // Suppresses warnings in stderr
     opterr = 0;
-    while ((c = getopt(argc, argv, "b:u:")) != -1)
+    while ((c = getopt(argc, argv, "b:u:d")) != -1)
     {
 
         switch (c)
@@ -31,6 +31,10 @@ int read_options(int argc, char **argv, data_cache *data)
                 fprintf(stderr, "Invalid IPv4 address\n");
                 return false;
             }
+            break;
+
+        case 'd':
+            data->encode = false;
             break;
 
         case '?':
