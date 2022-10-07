@@ -7,10 +7,11 @@
 #include "utils.h"
 
 #ifndef _XOPEN_SOURCE
-    #define _XOPEN_SOURCE
+#define _XOPEN_SOURCE
 #endif // !_XOPEN_SOURCE
 
- int read_options(int argc, char **argv, data_cache *data) {
+int read_options(int argc, char **argv, data_cache *data)
+{
     int c;
     // Suppresses warnings in stderr
     opterr = 0;
@@ -45,7 +46,8 @@
         }
     }
 
-    if (data->host[0] == '\0') {
+    if (data->host[0] == '\0')
+    {
         fprintf(stderr, "Missing host\n");
         return false;
     }
@@ -74,16 +76,19 @@
     return true;
 }
 
-int switchToTCP(int fd, const struct sockaddr *dest, unsigned char *packet, int length) {
+int switchToTCP(int fd, const struct sockaddr *dest, unsigned char *packet, int length)
+{
     close(fd);
-    
+
     // open TCP
-    if ((fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
+    if ((fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1)
+    {
         perror("socket() failed\n");
         return false;
     }
 
-    if (connect(fd, dest, sizeof(struct sockaddr_in)) == -1) {
+    if (connect(fd, dest, sizeof(struct sockaddr_in)) == -1)
+    {
         perror("connect() failed\n");
         return false;
     }
@@ -91,11 +96,13 @@ int switchToTCP(int fd, const struct sockaddr *dest, unsigned char *packet, int 
     return true;
 }
 
-void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int* length, int proto) {
+void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int *length, int proto)
+{
 
     packet = &packet[dns_length];
-    if (proto == OPEN_TCP) {
-        *((uint16_t*)packet) = (uint16_t)*length;   // we do not consider +2 for payload
+    if (proto == OPEN_TCP)
+    {
+        *((uint16_t *)packet) = (uint16_t)*length; // we do not consider +2 for payload
         packet += 2;
     }
 
@@ -103,9 +110,10 @@ void appendMessage(unsigned char *packet, int dns_length, const unsigned char *p
     encode(packet, *length);
 
     if (proto == OPEN_TCP)
-        *length += 2;   // 2 bytes for TCP length
+        *length += 2; // 2 bytes for TCP length
 }
 
-void appendFileName(unsigned char *packet, int dns_length, const unsigned char *file) {
+void appendFileName(unsigned char *packet, int dns_length, const unsigned char *file)
+{
     strcpy(&packet[dns_length], file);
 }
