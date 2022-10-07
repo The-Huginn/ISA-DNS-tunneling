@@ -81,6 +81,7 @@ int serverTCP(struct sockaddr_in *server)
             }
             current += msg_len;
 
+            decode(payload, msg_len);
             for (int i = 0; i < msg_len; i++)
             {
                 if (fputc(payload[i], output) == EOF)
@@ -145,6 +146,7 @@ int serverUDP(struct sockaddr_in *server, char **argv)
         else
         { // all payload in current UDP packet
             fprintf(stderr, "UDP connection sufficient\n");
+            decode(payload, msg_size);
             for (int i = 0; i < msg_size; i++)
             {
                 if (fputc(payload[i], output) == EOF)
@@ -179,7 +181,7 @@ int main(int argc, char **argv)
     struct sockaddr_in server;
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = htonl(INADDR_ANY);
-    server.sin_port = htons(PORT);
+    server.sin_port = htons(5556);
 
     signal(SIGINT, my_handler);
 
