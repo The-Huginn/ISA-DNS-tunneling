@@ -239,7 +239,7 @@ int main(int argc, char *argv[])
     memset(data.host, '\0', sizeof(data.host));
 
     dest.sin_family = AF_INET;
-    dest.sin_port = htons(5556); // set the server port (network byte order)
+    dest.sin_port = htons(PORT); // set the server port (network byte order)
 
     if (read_options(argc, argv, &data) == false)
         return -1;
@@ -274,7 +274,7 @@ int main(int argc, char *argv[])
         ret = -1;
 
     // Closing resources
-    usleep(200000); //sleep for 200ms
+    sleep(1); //sleep for 1s
     if (child != 0)
         kill(child, SIGKILL);
 
