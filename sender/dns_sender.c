@@ -160,6 +160,9 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         while ((msg_size = recvfrom(fd, payload, UDP_MTU, 0, (struct sockaddr *)&from, &len)) >= 0)
         {
             unsigned char *reply = readPayload(payload, &msg_size, true);
+            if (data->encode)
+                decode(reply, msg_size);
+                
             fprintf(stderr, "Reply from the server: %s\n", reply);
         }
     }
@@ -278,10 +281,8 @@ int main(int argc, char *argv[])
             return -1;
 
     length = addResource(packet, length);
-    fprintf(stderr, "%d\n", length);
     appendFileName(packet, length, data.dst_file);
     length += strlen(data.dst_file) + 1;
-    fprintf(stderr, "%d\n", length);
 
     // Execution
     if (!sendIPv4(fd, &data, packet, length, &dest))
