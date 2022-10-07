@@ -83,6 +83,8 @@ int serverTCP(struct sockaddr_in *server)
             {
                 current = 0;
                 total = received;
+                // skip file name, which is in the beggining
+                payload = payload + strlen(payload) + 1;
             }
             current += msg_len;
 
@@ -141,7 +143,7 @@ int serverUDP(struct sockaddr_in *server, char **argv)
         sendReply(udp, reply, headerLength, (struct sockaddr *)&client, returnCode);
 
         // unable to open file, just send a reply
-        if (!openFile(path, buffer))
+        if (!openFile(path, &payload))
         {
             strcpy(returnCode, "unable to open file");
             sendReply(udp, reply, headerLength, (struct sockaddr *)&client, returnCode);
