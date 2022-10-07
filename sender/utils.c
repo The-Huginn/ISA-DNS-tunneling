@@ -95,25 +95,3 @@ int switchToTCP(int fd, const struct sockaddr *dest, unsigned char *packet, int 
 
     return true;
 }
-
-void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int *length, int proto)
-{
-
-    packet = &packet[dns_length];
-    if (proto == OPEN_TCP)
-    {
-        *((uint16_t *)packet) = (uint16_t)*length; // we do not consider +2 for payload
-        packet += 2;
-    }
-
-    memcpy(packet, payload, *length);
-    encode(packet, *length);
-
-    if (proto == OPEN_TCP)
-        *length += 2; // 2 bytes for TCP length
-}
-
-void appendFileName(unsigned char *packet, int dns_length, const unsigned char *file)
-{
-    strcpy(&packet[dns_length], file);
-}

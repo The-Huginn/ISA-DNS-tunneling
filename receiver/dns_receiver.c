@@ -18,6 +18,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#include <stddef.h>
 
 #include "utils.h"
 #include "../helpers/dnsUtils.h"
@@ -66,18 +67,22 @@ int serverTCP(struct sockaddr_in *server)
                 return false;
             }
 
+            int received = msg_len;
+
             // last packet received
             if (checkProto((dns_header *)buffer, OPEN_UDP))
                 last = true;
 
-            unsigned char *payload = readPayload(buffer, &msg_len, total == 0, OPEN_TCP);
+            unsigned char *payload = readPayload(buffer, &received, total == 0);
+
+            ptrdiff_t diff = buffer - payload;
+            msg_len = diff; // actual size of the payload
 
             // first packet
             if (total == 0)
             {
                 current = 0;
-                total = *((uint16_t *)payload);
-                payload += 2;
+                total = received;
             }
             current += msg_len;
 
@@ -122,17 +127,24 @@ int serverUDP(struct sockaddr_in *server, char **argv)
     while ((msg_size = recvfrom(udp, buffer, UDP_MTU, 0, (struct sockaddr *)&client, &length)) >= 0)
     {
         fprintf(stderr, "Server received packet\n");
+
+        unsigned char reply[UDP_MTU];
+        int headerLength = msg_size;
+
         unsigned char returnCode[RETURN_CODE] = "received request\0";
-        unsigned char *payload = readPayload(buffer, &msg_size, true, OPEN_UDP);
+        unsigned char *payload = readPayload(buffer, &msg_size, true);
+        headerLength -= msg_size;
+
+        memcpy(reply, buffer, headerLength);
         unsigned char *qname = &buffer[HEADER_SIZE]; // skip header and point to first qname
 
-        sendReply(udp, returnCode, qname, (struct sockaddr*)&client);
+        sendReply(udp, reply, headerLength, (struct sockaddr *)&client, returnCode);
 
         // unable to open file, just send a reply
         if (!openFile(path, buffer))
         {
             strcpy(returnCode, "unable to open file");
-            sendReply(udp, returnCode, qname, (struct sockaddr *)&client);
+            sendReply(udp, reply, headerLength, (struct sockaddr *)&client, returnCode);
             continue;
         }
 
@@ -161,7 +173,7 @@ int serverUDP(struct sockaddr_in *server, char **argv)
         output = NULL;
         // send a reply
         strcpy(returnCode, "OK");
-        sendReply(udp, returnCode, qname, (struct sockaddr *)&client);
+        sendReply(udp, reply, headerLength, (struct sockaddr *)&client, returnCode);
 
         fprintf(stderr, "Transfer finished, waiting for new client\n");
     }

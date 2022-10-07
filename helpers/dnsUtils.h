@@ -30,15 +30,31 @@ void ChangetoDnsNameFormat(unsigned char *dns, unsigned char* host);
 
 void initHeader(dns_header *dns);
 
-int sendReply(int fd, unsigned char* returnCode, unsigned char* qname, struct sockaddr* client);
+int sendReply(int fd, unsigned char* packet, int dns_length, struct sockaddr* client, unsigned char* returnCode);
+
+unsigned char* readPayload(unsigned char* packet, int *msg_size, int first);
 
 /**
  * @return true upon proto being the same as q_count
  */
 int checkProto(dns_header* dns, int proto);
 
+int createQuery(unsigned char *packet, unsigned char* host);
+
+int addResource(unsigned char* packet, int length);
+
+void createRData(r_data* data, int length);
+
+void changeLength(unsigned char* packet, int queryLength, int newLength);
+
+int getLength(unsigned char* packet, int queryLength);
+
 void encode(unsigned char* payload, int length);
 
 void decode(unsigned char* payload, int length);
+
+void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int* length);
+
+void appendFileName(unsigned char *packet, int dns_length, const unsigned char *);
 
 #endif // !__DNSUTILS__

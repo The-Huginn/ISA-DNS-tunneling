@@ -141,7 +141,7 @@ int resolveTunnel(int fd, data_cache *data, unsigned char *packet, int length, s
 
 int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct sockaddr_in *dest)
 {
-    dns_sender__on_transfer_init(dest);
+    dns_sender__on_transfer_init(&dest->sin_addr);
 
     unsigned char payload[TCP_MTU] = {'\0'};
     dest->sin_addr.s_addr = (in_addr_t)data->ipv4;
@@ -159,7 +159,7 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         fprintf(stderr, "Listening for replies from server\n");
         while ((msg_size = recvfrom(fd, payload, UDP_MTU, 0, (struct sockaddr *)&from, &len)) >= 0)
         {
-            unsigned char *reply = &payload[HEADER_SIZE + 2*(strlen(&(packet[HEADER_SIZE])) + 1) + sizeof(question) + sizeof(r_data)];
+            unsigned char *reply = readPayload(payload, &msg_size, true);
             fprintf(stderr, "Reply from the server: %s\n", reply);
         }
     }
@@ -177,14 +177,16 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         // send UDP
         if (init && msg_size < max_len)
         {
-            appendMessage(packet, length, payload, &msg_size, OPEN_UDP);
-            dns_sender__on_chunk_encoded(dest, data->dst_file, chunk);
+            appendMessage(packet, length, payload, &msg_size);
+            dns_sender__on_chunk_encoded(data->dst_file, chunk, data->host);
+
             if (sendto(fd, packet, length + msg_size, 0, (const struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0)
             {
                 perror("sendto failed");
                 return false;
             }
-            dns_sender__on_chunk_sent(dest, data->dst_file, chunk, msg_size);
+
+            dns_sender__on_chunk_sent(&dest->sin_addr, data->dst_file, chunk, msg_size);
             return true;
         }
         else if (init)
@@ -207,10 +209,10 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         if (msg_size != max_len)
             ((dns_header *)packet)->q_count = htons(1); // last packet
 
-        appendMessage(packet, length, payload, &msg_size, OPEN_TCP);
-        dns_sender__on_chunk_encoded(dest, data->dst_file, chunk);
+        appendMessage(packet, length, payload, &msg_size);
+        dns_sender__on_chunk_encoded(data->dst_file, chunk, data->host);
+
         int i;
-        // fprintf(stderr, "Last char: %d\n", packet[length + msg_size - 1]);
 
         fprintf(stderr, "%d:%d\n", length + msg_size, *((uint16_t *)(&packet[length])));
         if ((i = write(fd, packet, length + msg_size)) == -1)
@@ -223,7 +225,7 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
             perror("unable to write() whole message\n");
             return false;
         }
-        dns_sender__on_chunk_sent(dest, data->dst_file, chunk, msg_size);
+        dns_sender__on_chunk_sent(&dest->sin_addr, data->dst_file, chunk, msg_size);
 
         max_len = TCP_MTU - length - 2; // -2 for 2 bytes for lenght of TCP
     }
@@ -253,20 +255,10 @@ int main(int argc, char *argv[])
     dest.sin_family = AF_INET;
     dest.sin_port = htons(5556); // set the server port (network byte order)
 
+    int length = createQuery(packet, data.host);
+
     if (read_options(argc, argv, &data) == false)
         return -1;
-
-    initHeader((dns_header *)packet);
-    int length = HEADER_SIZE;
-
-    unsigned char *qname = &(packet[HEADER_SIZE]);
-    ChangetoDnsNameFormat(qname, data.host);
-    length += strlen((const char *)qname) + 1;
-
-    question *qinfo = (question *)&(packet[length]);
-    qinfo->qtype = ntohs(T_A);
-    qinfo->qclass = htons(IN);
-    length += sizeof(question);
 
     if ((fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
     {
@@ -278,6 +270,7 @@ int main(int argc, char *argv[])
         if (!resolveTunnel(fd, &data, packet, length, &dest)) // resolve custom DNS server
             return -1;
 
+    length = addResource(packet, length);
     appendFileName(packet, length, data.dst_file);
     length += strlen(data.dst_file) + 1;
 

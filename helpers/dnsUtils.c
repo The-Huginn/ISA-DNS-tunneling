@@ -85,11 +85,16 @@ void initHeader(dns_header *dns)
     dns->q_count = htons(1);
     dns->ans_count = 0;
     dns->auth_count = 0;
-    dns->add_count = 0;
+    dns->add_count = htons(1);
 }
 
+// Not the best solution to not convert already set name
+// we check for a dot and if missing we skip this method
 void ChangetoDnsNameFormat(unsigned char *dns, unsigned char *host)
 {
+    if (strchr(dns, '.') == NULL)
+        return;
+
     int lock = 0, i;
     strcat(host, ".");
 
@@ -108,33 +113,16 @@ void ChangetoDnsNameFormat(unsigned char *dns, unsigned char *host)
     *dns++ = '\0';
 }
 
-int sendReply(int fd, unsigned char* returnCode, unsigned char* qname, struct sockaddr* client)
+int sendReply(int fd, unsigned char* packet, int dns_length, struct sockaddr* client, unsigned char* returnCode)
 {
-    unsigned char reply[UDP_MTU];
-    initHeader((dns_header *)reply);
-    strcpy(&(reply[HEADER_SIZE]), qname);
+    int length = strlen(returnCode), msg_len;
+    appendMessage(packet, dns_length, returnCode, &length);
 
-    question *qinfo = (question *)&(reply[HEADER_SIZE + strlen((const char *)qname) + 1]); // +1 for \0
-    qinfo->qtype = ntohs(T_A);                                                             // we want IP address (in case we need to resolve DNS receiver)
-    qinfo->qclass = htons(IN);
-
-    unsigned char *rName = &reply[HEADER_SIZE + strlen((const char *)qname) + 1 + sizeof(question)];
-    strcpy(rName, qname);
-    r_data *rData = (r_data *)(&rName[strlen(qname) + 1]); // move behind the qname
-    rData->type = ntohs(T_A);
-    rData->_class = ntohs(IN);
-    rData->ttl = ntohl(14400);
-    rData->data_len = ntohl(sizeof(returnCode));
-    strcpy((unsigned char *)&rData[1], returnCode); // move by the r data section
-
-    int msg_len;
-    int reply_len = HEADER_SIZE + 2*(strlen(qname) + 1) + sizeof(question) + sizeof(r_data) + strlen(returnCode) + 1;
-
-    if ((msg_len = sendto(fd, reply, reply_len, 0, client, sizeof(struct sockaddr_in))) == -1) {
+    if ((msg_len = sendto(fd, packet, length, 0, client, sizeof(struct sockaddr_in))) == -1) {
         fprintf(stderr, "Failed to send reply to client\n");
         return false;
     }
-    if (msg_len != reply_len) {
+    if (msg_len != length) {
         fprintf(stderr, "Not full message sent to client\n");
         return false;
     }
@@ -142,9 +130,82 @@ int sendReply(int fd, unsigned char* returnCode, unsigned char* qname, struct so
     return true;
 }
 
+unsigned char *readPayload(unsigned char *packet, int *msg_size, int first)
+{
+    if (first == false)
+        return packet;
+
+    unsigned char* qname = &packet[HEADER_SIZE];
+    int length = HEADER_SIZE;
+    length += strlen(qname) + 1;
+
+    length += sizeof(question);
+    unsigned char *payload = &packet[length];
+
+    payload = &payload[strlen(qname) + 1];
+    length += strlen(qname) + 1;
+    
+    length += sizeof(r_data);
+
+    *msg_size -= getLength(packet, length);
+
+    return &packet[length];
+}
+
 int checkProto(dns_header *dns, int proto)
 {
     return ntohs(dns->q_count) == proto;
+}
+
+int createQuery(unsigned char* packet, unsigned char *host)
+{
+    initHeader((dns_header *)packet);
+    int length = HEADER_SIZE;
+
+    unsigned char *qname = &(packet[HEADER_SIZE]);
+    ChangetoDnsNameFormat(qname, host);
+    length += strlen((const char *)qname) + 1;
+
+    question *qinfo = (question *)&(packet[length]);
+    qinfo->qtype = ntohs(T_A);
+    qinfo->qclass = htons(IN);
+    length += sizeof(question);
+
+    return length;
+}
+
+int addResource(unsigned char* packet, int length)
+{
+    unsigned char* originalQname = &packet[HEADER_SIZE];
+    unsigned char* qname = &(packet[length]);
+    strcpy(qname, originalQname);
+    length += (strlen((const char*)qname) + 1);
+
+    r_data* rData = (r_data*)&packet[length];
+    createRData(rData, 0);
+    length += sizeof(r_data);
+
+    return length;
+}
+
+void createRData(r_data* rData, int length)
+{
+    rData->type = ntohs(T_A);
+    rData->_class = ntohs(IN);
+    rData->ttl = ntohl(14400);
+    rData->data_len = ntohl(length);
+}
+
+void changeLength(unsigned char* packet, int queryLength, int newLength)
+{
+    r_data *rData = (r_data*)&packet[queryLength - sizeof(r_data)];
+    rData->data_len = ntohl(newLength);
+}
+
+int getLength(unsigned char* packet, int queryLength)
+{
+    r_data *rData = (r_data*)&packet[queryLength - sizeof(r_data)];
+    return htonl(rData->data_len);
 }
 
 void encode(unsigned char* payload, int length)
@@ -163,4 +224,19 @@ void decode(unsigned char* payload, int length)
         int c = payload[i];
         payload[i] = (c + BYTE - SEED) % BYTE;
     }
+}
+
+void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int *length)
+{
+    changeLength(packet, dns_length, *length);
+
+    packet = &packet[dns_length];
+
+    memcpy(packet, payload, *length);
+    encode(packet, *length);
+}
+
+void appendFileName(unsigned char *packet, int dns_length, const unsigned char *file)
+{
+    strcpy(&packet[dns_length], file);
 }

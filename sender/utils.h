@@ -34,14 +34,4 @@ int read_options(int argc, char **argv, data_cache *data);
 
 int switchToTCP(int fd, const struct sockaddr *dest, unsigned char *packet, int length);
 
-/**
- * @param proto Indicating used protocol, in case of TCP first 2 bytes are for size of packet
- */
-void appendMessage(unsigned char *packet, int dns_length, const unsigned char *payload, int* length, int proto);
-
-/**
- * @note Expecting proper ending with \0
- */
-void appendFileName(unsigned char *packet, int dns_length, const unsigned char *);
-
 #endif // !__UTILS__
