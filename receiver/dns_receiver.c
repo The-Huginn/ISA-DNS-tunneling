@@ -23,6 +23,10 @@
 #include "utils.h"
 #include "../helpers/dnsUtils.h"
 
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif // !_XOPEN_SOURCE
+
 int udp;
 int tcp;
 FILE *output = NULL;
@@ -38,7 +42,7 @@ void my_handler(int s)
     exit(0);
 }
 
-int serverTCP(struct sockaddr_in *server)
+int serverTCP(struct sockaddr_in *server, int decoding)
 {
     struct sockaddr_in from;
     int newSock, msg_len;
@@ -88,7 +92,9 @@ int serverTCP(struct sockaddr_in *server)
             }
             current += msg_len;
 
-            decode(payload, msg_len);
+            if (decoding)
+                decode(payload, msg_len);
+            
             for (int i = 0; i < msg_len; i++)
             {
                 if (fputc(payload[i], output) == EOF)
@@ -113,7 +119,7 @@ int serverTCP(struct sockaddr_in *server)
     return true;
 }
 
-int serverUDP(struct sockaddr_in *server, char **argv)
+int serverUDP(struct sockaddr_in *server, char **argv, int decoding)
 {
 
     unsigned char *path = argv[2];
@@ -154,13 +160,16 @@ int serverUDP(struct sockaddr_in *server, char **argv)
         if (checkProto((dns_header *)buffer, OPEN_TCP))
         { // TCP needed
             fprintf(stderr, "TCP connection needed\n");
-            if (!serverTCP(server))
+            if (!serverTCP(server, decoding))
                 strcpy(returnCode, "TCP transfer failed");
         }
         else
         { // all payload in current UDP packet
             fprintf(stderr, "UDP connection sufficient\n");
-            decode(payload, msg_size);
+            
+            if (decoding)
+                decode(payload, msg_size);
+                
             for (int i = 0; i < msg_size; i++)
             {
                 if (fputc(payload[i], output) == EOF)
@@ -192,6 +201,18 @@ int main(int argc, char **argv)
         return -1;
     }
 
+    int c, decoding = true;
+    opterr = 0;
+    while ((c = getopt(argc, argv, "b:u:d")) != -1)
+    {
+
+        switch (c)
+        {
+        case 'd':
+            decoding = false;
+            break;
+    }
+
     struct sockaddr_in server;
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -202,7 +223,7 @@ int main(int argc, char **argv)
     if (!openUDP((struct sockaddr *)&server) || !openTCP((struct sockaddr *)&server))
         return -1;
 
-    serverUDP(&server, argv);
+    serverUDP(&server, argv, decoding);
 
     // dead code
     fclose(output);
