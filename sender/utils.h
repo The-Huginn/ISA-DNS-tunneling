@@ -18,6 +18,9 @@
 #define DEFAULT_IPV6 {8193, 18528, 18528, 0, 0, 0, 0, 25700}// IPv6 for google.com - 2001:4860:4860::6464
 #define DEFAULT_NONE -1
 
+extern pid_t child;
+extern int fd;
+
 typedef struct
 {
     uint32_t ipv4;

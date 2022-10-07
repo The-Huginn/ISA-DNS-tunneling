@@ -65,7 +65,6 @@ int serverTCP(struct sockaddr_in *server)
                 fprintf(stderr, "Unable to read from TCP stream\n");
                 return false;
             }
-            fprintf(stderr, "Lenght: %d\n", msg_len);
 
             // last packet received
             if (checkProto((dns_header *)buffer, OPEN_UDP))
@@ -94,7 +93,6 @@ int serverTCP(struct sockaddr_in *server)
             msg_len = payload[msg_len - 1];
         }
 
-        // fprintf(stderr, "Last char: %d\n", msg_len);
         close(newSock);
 
         if (last)
@@ -118,17 +116,22 @@ int serverUDP(struct sockaddr_in *server, char **argv)
     socklen_t length;
 
     length = sizeof(client);
+    fprintf(stderr, "Starting UDP server\n");
 
     while ((msg_size = recvfrom(udp, buffer, UDP_MTU, 0, (struct sockaddr *)&client, &length)) >= 0)
     {
         fprintf(stderr, "Server received packet\n");
         unsigned char returnCode[RETURN_CODE] = "OK\0";
-
-        if (!openFile(path, buffer))
-            strcpy(returnCode, "unable to open file");
-
         unsigned char *payload = readPayload(buffer, &msg_size, true);
         unsigned char *qname = &buffer[HEADER_SIZE]; // skip header and point to first qname
+
+        // unable to open file, just send a reply
+        if (!openFile(path, buffer))
+        {
+            strcpy(returnCode, "unable to open file");
+            sendReply(udp, returnCode, qname, (struct sockaddr *)&client);
+            continue;
+        }
 
         // checks if TCP is needed, otherwise writes data here
         if (checkProto((dns_header *)buffer, OPEN_TCP))
@@ -151,6 +154,7 @@ int serverUDP(struct sockaddr_in *server, char **argv)
         }
 
         fclose(output);
+        output = NULL;
         // send a reply
         sendReply(udp, returnCode, qname, (struct sockaddr *)&client);
 
@@ -172,7 +176,7 @@ int main(int argc, char **argv)
     struct sockaddr_in server;
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = htonl(INADDR_ANY);
-    server.sin_port = htons(5558);
+    server.sin_port = htons(PORT);
 
     signal(SIGINT, my_handler);
 
