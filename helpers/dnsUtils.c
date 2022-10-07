@@ -117,6 +117,7 @@ int sendReply(int fd, unsigned char* returnCode, unsigned char* qname, struct so
     question *qinfo = (question *)&(reply[HEADER_SIZE + strlen((const char *)qname) + 1]); // +1 for \0
     qinfo->qtype = ntohs(T_A);                                                             // we want IP address (in case we need to resolve DNS receiver)
     qinfo->qclass = htons(IN);
+
     unsigned char *rName = &reply[HEADER_SIZE + strlen((const char *)qname) + 1 + sizeof(question)];
     strcpy(rName, qname);
     r_data *rData = (r_data *)(&rName[strlen(qname) + 1]); // move behind the qname
@@ -126,7 +127,8 @@ int sendReply(int fd, unsigned char* returnCode, unsigned char* qname, struct so
     rData->data_len = ntohl(sizeof(returnCode));
     strcpy((unsigned char *)&rData[1], returnCode); // move by the r data section
 
-    int msg_len, reply_len = HEADER_SIZE + 2*(strlen(qname) + 1) + sizeof(question) + sizeof(r_data) + strlen(returnCode) + 1;
+    int msg_len;
+    int reply_len = HEADER_SIZE + 2*(strlen(qname) + 1) + sizeof(question) + sizeof(r_data) + strlen(returnCode) + 1;
 
     if ((msg_len = sendto(fd, reply, reply_len, 0, client, sizeof(struct sockaddr_in))) == -1) {
         fprintf(stderr, "Failed to send reply to client\n");

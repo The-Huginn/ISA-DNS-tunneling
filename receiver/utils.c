@@ -80,7 +80,7 @@ unsigned char *readPayload(unsigned char *buffer, int *msg_size, int first)
 
     payload = &payload[strlen(&buffer[length]) + 1];    // skip file name
     length += strlen(&buffer[length]) + 1;
-    *msg_size -= length;
+    *msg_size -= (length + 2);    // we do not consider +2 for payload
 
     return &buffer[length];
 }

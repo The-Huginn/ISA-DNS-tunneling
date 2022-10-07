@@ -54,6 +54,7 @@ int serverTCP(struct sockaddr_in *server)
 
         int total = 0;
         int current = 1; // cant be same as total
+        int last = false;
 
         while (total != current)
         {
@@ -64,6 +65,11 @@ int serverTCP(struct sockaddr_in *server)
                 fprintf(stderr, "Unable to read from TCP stream\n");
                 return false;
             }
+            fprintf(stderr, "Lenght: %d\n", msg_len);
+
+            // last packet received
+            if (checkProto((dns_header *)buffer, OPEN_UDP))
+                last = true;
 
             unsigned char *payload = readPayload(buffer, &msg_len, total == 0);
 
@@ -71,7 +77,7 @@ int serverTCP(struct sockaddr_in *server)
             if (total == 0)
             {
                 current = 0;
-                total = *((uint16_t*)payload);
+                total = *((uint16_t *)payload);
                 payload += 2;
             }
             current += msg_len;
@@ -84,12 +90,14 @@ int serverTCP(struct sockaddr_in *server)
                     return false;
                 }
             }
+            fprintf(stderr, "%d:%d\n", total, current);
+            msg_len = payload[msg_len - 1];
         }
 
+        // fprintf(stderr, "Last char: %d\n", msg_len);
         close(newSock);
 
-        // last packet received
-        if (checkProto((dns_header *)buffer, OPEN_UDP))
+        if (last)
         {
             fprintf(stderr, "Last packet received, listening on UDP again\n");
             return true;
@@ -145,6 +153,8 @@ int serverUDP(struct sockaddr_in *server, char **argv)
         fclose(output);
         // send a reply
         sendReply(udp, returnCode, qname, (struct sockaddr *)&client);
+
+        fprintf(stderr, "Transfer finished, waiting for new client\n");
     }
 
     return true;
@@ -162,7 +172,7 @@ int main(int argc, char **argv)
     struct sockaddr_in server;
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = htonl(INADDR_ANY);
-    server.sin_port = htons(5557);
+    server.sin_port = htons(5558);
 
     signal(SIGINT, my_handler);
 
