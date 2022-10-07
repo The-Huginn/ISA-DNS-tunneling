@@ -79,8 +79,8 @@ int serverTCP(struct sockaddr_in *server, int encoding)
 
             unsigned char *payload = readPayload(buffer, &received, total == 0);
 
-            ptrdiff_t diff = buffer - payload;
-            msg_len = diff; // actual size of the payload
+            ptrdiff_t diff = payload - buffer;
+            msg_len = msg_len - diff; // actual size of the payload
 
             // first packet
             if (total == 0)
@@ -217,7 +217,7 @@ int main(int argc, char **argv)
     struct sockaddr_in server;
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = htonl(INADDR_ANY);
-    server.sin_port = htons(5556);
+    server.sin_port = htons(5557);
 
     signal(SIGINT, my_handler);
 
