@@ -177,8 +177,8 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         // send UDP
         if (init && msg_size < max_len)
         {
-            appendMessage(packet, length, payload, msg_size);
-            if (encode)
+            appendMessage(packet, length - (strlen(data->dst_file) + 1), payload, msg_size);
+            if (data->encode)
                 encode(&packet[length], msg_size);
 
             dns_sender__on_chunk_encoded(data->dst_file, chunk, data->host);
@@ -212,10 +212,10 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         if (msg_size != max_len)
             ((dns_header *)packet)->q_count = htons(1); // last packet
 
-        appendMessage(packet, length, payload, &msg_size);
-        if (encode)
+        appendMessage(packet, length - (strlen(data->dst_file) + 1), payload, msg_size);
+        if (data->encode)
                 encode(&packet[length], msg_size);
-                
+
         dns_sender__on_chunk_encoded(data->dst_file, chunk, data->host);
 
         int i;
