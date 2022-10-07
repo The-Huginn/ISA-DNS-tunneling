@@ -16,6 +16,6 @@ int openUDP(struct sockaddr* server);
 
 int openTCP(struct sockaddr* server);
 
-int openFile(unsigned char* path, unsigned char** buffer);
+int openFile(unsigned char* path, unsigned char** buffer, int *fileLength);
 
 #endif // !__UTILS__

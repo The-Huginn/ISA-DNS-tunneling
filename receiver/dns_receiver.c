@@ -87,7 +87,9 @@ int serverTCP(struct sockaddr_in *server, int encoding)
             {
                 current = 0;
                 total = received;
+
                 // skip file name, which is in the beggining
+                msg_len -= (strlen(payload) + 1);
                 payload = payload + strlen(payload) + 1;
             }
             current += msg_len;
@@ -119,10 +121,11 @@ int serverTCP(struct sockaddr_in *server, int encoding)
     return true;
 }
 
-int serverUDP(struct sockaddr_in *server, char **argv, int encoding)
+int serverUDP(struct sockaddr_in *server, char **argv, int argStart, int encoding)
 {
-
-    unsigned char *path = argv[2];
+    unsigned char host[STRING_SIZE + 1];
+    ChangetoDnsNameFormat(host, argv[argStart]);
+    unsigned char *path = argv[argStart + 1];
 
     int msg_size, i;
     char buffer[UDP_MTU];
@@ -146,10 +149,19 @@ int serverUDP(struct sockaddr_in *server, char **argv, int encoding)
         memcpy(reply, buffer, headerLength);
         unsigned char *qname = &buffer[HEADER_SIZE]; // skip header and point to first qname
 
+        if (strcmp(qname, host) != 0)
+        {
+            fprintf(stderr, "Host name does not match\n");
+            strcpy(returnCode, "Host name does not match");
+            sendReply(udp, reply, headerLength, (struct sockaddr*)&client, returnCode, encoding);
+            continue;
+        }
+
         sendReply(udp, reply, headerLength, (struct sockaddr *)&client, returnCode, encoding);
 
         // unable to open file, just send a reply
-        if (!openFile(path, &payload))
+        int fileLength;
+        if (!openFile(path, &payload, &fileLength))
         {
             strcpy(returnCode, "unable to open file");
             sendReply(udp, reply, headerLength, (struct sockaddr *)&client, returnCode, encoding);
@@ -194,13 +206,6 @@ int serverUDP(struct sockaddr_in *server, char **argv, int encoding)
 
 int main(int argc, char **argv)
 {
-
-    if (argc < 3)
-    {
-        fprintf(stderr, "Missing arguments\n");
-        return -1;
-    }
-
     int c, encoding = true;
     opterr = 0;
     while ((c = getopt(argc, argv, "d")) != -1)
@@ -214,17 +219,23 @@ int main(int argc, char **argv)
         }
     }
 
+    if (optind < 2 || optind >= argc)
+    {
+        fprintf(stderr, "Missing arguments\n");
+        return -1;
+    }
+
     struct sockaddr_in server;
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = htonl(INADDR_ANY);
-    server.sin_port = htons(5557);
+    server.sin_port = htons(5558);
 
     signal(SIGINT, my_handler);
 
     if (!openUDP((struct sockaddr *)&server) || !openTCP((struct sockaddr *)&server))
         return -1;
 
-    serverUDP(&server, argv, encoding);
+    serverUDP(&server, argv, optind, encoding);
 
     // dead code
     fclose(output);

@@ -64,12 +64,13 @@ int openTCP(struct sockaddr *server)
     return true;
 }
 
-int openFile(unsigned char *path, unsigned char **buffer)
+int openFile(unsigned char *path, unsigned char **buffer, int *fileLength)
 {
     unsigned char file[STRING_SIZE + 1] = {'\0'};
     // read file name
     strcpy(file, *buffer);
     *buffer = *buffer + strlen(file) + 1;
+    *fileLength = strlen(file) + 1;
     
     // open file
     unsigned char *fullPath = (unsigned char *)malloc(strlen(path) + strlen(file) + 1);

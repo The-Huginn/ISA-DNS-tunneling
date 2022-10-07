@@ -145,12 +145,11 @@ unsigned char *readPayload(unsigned char *packet, int *msg_size, int first)
     length += sizeof(question);
     unsigned char *payload = &packet[length];
 
-    payload = &payload[strlen(qname) + 1];
     length += strlen(qname) + 1;
     
     length += sizeof(r_data);
 
-    *msg_size -= getLength(packet, length);
+    *msg_size = getLength(packet, length);
 
     return &packet[length];
 }
