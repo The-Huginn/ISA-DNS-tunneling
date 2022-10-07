@@ -142,7 +142,6 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         else if (init)
         { // send one UDP to inform about TCP, still sends name of the file
             init = false;
-            max_len = TCP_MTU - length - 2; // -2 for 2 bytes for lenght of TCP
 
             ((dns_header *)packet)->q_count = htons(2);
 
@@ -157,9 +156,13 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
             return false;
 
         // TCP communication
+        if (msg_size != max_len)
+            ((dns_header*)packet)->q_count = htons(1);  // last packet
         appendMessage(packet, length, payload, &msg_size, OPEN_TCP);
         int i;
+        // fprintf(stderr, "Last char: %d\n", packet[length + msg_size - 1]);
 
+        fprintf(stderr, "%d:%d\n", length + msg_size, *((uint16_t*)(&packet[length])));
         if ((i = write(fd, packet, length + msg_size)) == -1)
         {
             perror("unable to write()\n");
@@ -170,29 +173,33 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
             perror("unable to write() whole message\n");
             return false;
         }
+
+        max_len = TCP_MTU - length - 2; // -2 for 2 bytes for lenght of TCP
     }
 
     // End communication
-    if (!init)
-    {
-        if (!switchToTCP(fd, (const struct sockaddr *)dest, packet, length))
-            return false;
+    // if (!init)
+    // {
+    //     // if (!switchToTCP(fd, (const struct sockaddr *)dest, packet, length))
+    //     //     return false;
 
-        // Let TCP know, we finished
-        ((dns_header *)packet)->q_count = htons(1);
+    //     // Let TCP know, we finished
+    //     ((dns_header *)packet)->q_count = htons(1);
+    //     // set length of TCP packet
+    //     *((uint16_t*)&packet[length]) = 0;
 
-        int i;
-        if ((i = write(fd, packet, length + msg_size)) == -1)
-        {
-            perror("unable to write() last TCP packet\n");
-            return false;
-        }
-        else if (i != length + msg_size)
-        {
-            perror("unable to write() whole message of the last TCP packet\n");
-            return false;
-        }
-    }
+    //     int i;
+    //     if ((i = write(fd, packet, length + msg_size)) == -1)
+    //     {
+    //         perror("unable to write() last TCP packet\n");
+    //         return false;
+    //     }
+    //     else if (i != length + msg_size)
+    //     {
+    //         perror("unable to write() whole message of the last TCP packet\n");
+    //         return false;
+    //     }
+    // }
 
     return true;
 }
@@ -211,7 +218,7 @@ int main(int argc, char *argv[])
     memset(data.host, '\0', sizeof(data.host));
 
     dest.sin_family = AF_INET;
-    dest.sin_port = htons(5557); // set the server port (network byte order)
+    dest.sin_port = htons(5558); // set the server port (network byte order)
 
     if (read_options(argc, argv, &data) == false)
         return -1;

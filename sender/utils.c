@@ -95,7 +95,7 @@ void appendMessage(unsigned char *packet, int dns_length, const unsigned char *p
 
     packet = &packet[dns_length];
     if (proto == OPEN_TCP) {
-        *((uint16_t*)packet) = (uint16_t)*length + 2;
+        *((uint16_t*)packet) = (uint16_t)*length;   // we do not consider +2 for payload
         packet += 2;
     }
 
