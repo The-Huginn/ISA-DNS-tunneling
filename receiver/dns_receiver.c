@@ -203,14 +203,15 @@ int main(int argc, char **argv)
 
     int c, decoding = true;
     opterr = 0;
-    while ((c = getopt(argc, argv, "b:u:d")) != -1)
+    while ((c = getopt(argc, argv, "d")) != -1)
     {
 
         switch (c)
         {
-        case 'd':
-            decoding = false;
-            break;
+            case 'd':
+                decoding = false;
+                break;
+        }
     }
 
     struct sockaddr_in server;
