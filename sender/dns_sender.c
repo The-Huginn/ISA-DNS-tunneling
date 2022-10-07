@@ -153,7 +153,7 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         int msg_size;
         struct sockaddr_in from;
         socklen_t len = sizeof(from);
-        fprintf(stderr, "Child listening\n");
+        fprintf(stderr, "Listening for replies from server\n");
         while ((msg_size = recvfrom(fd, payload, UDP_MTU, 0, (struct sockaddr *)&from, &len)) >= 0)
         {
             unsigned char *reply = &payload[HEADER_SIZE + 2*(strlen(&(packet[HEADER_SIZE])) + 1) + sizeof(question) + sizeof(r_data)];
@@ -274,6 +274,7 @@ int main(int argc, char *argv[])
         ret = -1;
 
     // Closing resources
+    usleep(200000); //sleep for 200ms
     if (child != 0)
         kill(child, SIGKILL);
 
