@@ -165,6 +165,7 @@ int serverUDP(struct sockaddr_in *server, char **argv, int argStart, int encodin
         dns_receiver__on_query_parsed(path, payload);
 
         memcpy(reply, buffer, headerLength);
+        ((dns_header *)reply)->q_count = htons(1);
 
         unsigned char *qname = &buffer[HEADER_SIZE]; // skip header and point to first qname
 

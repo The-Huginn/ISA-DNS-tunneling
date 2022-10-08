@@ -28,6 +28,9 @@ Server waits for communication with `dns_sender` and saves the communication int
 * 2 means to keep TCP open and wait for further packets
 * 1 means this was the last packet and TCP can be closed
 
+### Default port
+* macro `PORT` is set to 53 (default DNS) and can be changed in `/helpers/dnsHeader.h` file
+
 ### Encryption
 Basic ceasar encryption is used to prevent easily reading the content of communication.
 
