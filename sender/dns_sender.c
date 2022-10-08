@@ -215,6 +215,8 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         if (msg_size != max_len)
             ((dns_header *)packet)->q_count = htons(1); // last packet
 
+        *((uint16_t*)&packet[-TCP_OFFSET]) = ntohs(msg_size + length);   // as RFC 1035 requires
+
         appendMessage(packet, length - (strlen(data->dst_file) + 1), payload, strlen(data->dst_file) + 1, msg_size);
         if (data->encode)
                 encode(&packet[length], msg_size);
@@ -224,12 +226,12 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         int i;
 
         fprintf(stderr, "%d:%d\n", length + msg_size, *((uint16_t *)(&packet[length])));
-        if ((i = write(fd, packet, length + msg_size)) == -1)
+        if ((i = write(fd, &packet[-TCP_OFFSET], length + msg_size + TCP_OFFSET)) == -1)
         {
             perror("unable to write()\n");
             return false;
         }
-        else if (i != length + msg_size)
+        else if (i != length + msg_size + TCP_OFFSET)
         {
             perror("unable to write() whole message\n");
             return false;
@@ -252,7 +254,8 @@ int main(int argc, char *argv[])
 
     // Initialization
     data_cache data;
-    unsigned char packet[TCP_MTU]; // for UDP communication only UDP_MTU should be used
+    unsigned char packet_b[TCP_MTU + TCP_OFFSET]; // for UDP communication only UDP_MTU should be used
+    unsigned char* packet = &packet_b[TCP_OFFSET];    // for TCP communication 2 bytes
     int ret = 0;
     struct sockaddr_in dest;
 

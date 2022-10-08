@@ -20,6 +20,7 @@
 #define OPEN_UDP 1
 #define OPEN_TCP 2
 #define RETURN_CODE 50
+#define TCP_OFFSET 2
 
 #define SEED 'A'
 #define BYTE 256
