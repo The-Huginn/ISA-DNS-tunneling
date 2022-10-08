@@ -242,6 +242,7 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
             return false;
         }
         dns_sender__on_chunk_sent(&dest->sin_addr, data->dst_file, chunk, length + msg_size + TCP_OFFSET);
+        sleep(1);
 
         max_len = TCP_MTU - length - TCP_OFFSET; // -2 for 2 bytes for lenght of TCP
     }
