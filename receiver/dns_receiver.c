@@ -4,8 +4,6 @@
  * @brief This file contains implementation of interface from dns_receiver.
  *  We receive dns queries as a form of communication with dns_sender
  */
-#include "dns_receiver.h"
-
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>

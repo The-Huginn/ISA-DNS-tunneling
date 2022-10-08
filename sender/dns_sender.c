@@ -13,7 +13,6 @@
 #include <regex.h>
 #include <signal.h>
 
-#include "dns_sender.h"
 #include "utils.h"
 #include "../helpers/dnsUtils.h"
 #include "dns_sender_events.h"
