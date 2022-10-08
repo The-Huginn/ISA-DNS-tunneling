@@ -7,6 +7,8 @@
 #ifndef __DNSHEADER__
 #define __DNSHEADER__
 
+#include <netinet/in.h>
+
 // RFC 1035 4.1.1
 typedef struct
 {

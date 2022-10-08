@@ -6,6 +6,7 @@
 #ifndef __UTILS__
 #define __UTILS__
 #include <arpa/inet.h>
+#include <sys/socket.h>
 #include <stdio.h>
 
 extern int udp;

@@ -105,7 +105,7 @@ int serverTCP(struct sockaddr_in *server, int encoding, unsigned char* path)
             }
             current += msg_len;
 
-            dns_receiver__on_query_parsed(path, chunk, payload);
+            dns_receiver__on_query_parsed(path, payload);
 
             if (encoding)
                 decode(payload, msg_len);
@@ -162,7 +162,7 @@ int serverUDP(struct sockaddr_in *server, char **argv, int argStart, int encodin
         unsigned char *payload = readPayload(buffer, &msg_size, true);
         int headerLength = payload - buffer;
 
-        dns_receiver__on_query_parsed(path, 0, payload);
+        dns_receiver__on_query_parsed(path, payload);
 
         memcpy(reply, buffer, headerLength);
 
