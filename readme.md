@@ -36,3 +36,6 @@ Basic ceasar encryption is used to prevent easily reading the content of communi
 * server does not allow normal dns communication
 * sender creates 2 processes where one logs return actions from the server. Because of this the shutdown of sender takes additional time to log incoming messages.
 * sender after every TCP packet sent (usually TCP_MTU bytes) sleeps for one second.
+
+### Final notes
+* Last update was 8.10. I hope no updated interfaces or assignments from this date :)
