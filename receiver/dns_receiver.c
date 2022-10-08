@@ -20,6 +20,7 @@
 
 #include "utils.h"
 #include "../helpers/dnsUtils.h"
+#include "dns_receiver_events.h"
 
 #ifndef _XOPEN_SOURCE
 #define _XOPEN_SOURCE
@@ -40,15 +41,18 @@ void my_handler(int s)
     exit(0);
 }
 
-int serverTCP(struct sockaddr_in *server, int encoding)
+int serverTCP(struct sockaddr_in *server, int encoding, unsigned char* path)
 {
     struct sockaddr_in from;
     int newSock, msg_len;
     socklen_t len = sizeof(from);
     unsigned char buffer_b[TCP_MTU];
+    int fileSize = 0;
+    int chunk = 0;
 
     while (true)
     {
+        chunk++;
         if ((newSock = accept(tcp, (struct sockaddr *)&from, &len)) == -1)
         {
             fprintf(stderr, "accept failed\n");
@@ -61,7 +65,6 @@ int serverTCP(struct sockaddr_in *server, int encoding)
 
         while (total != current)
         {
-
             unsigned char *buffer = buffer_b;
             // reading message
             if ((msg_len = read(newSock, buffer, TCP_MTU)) < 0)
@@ -69,6 +72,9 @@ int serverTCP(struct sockaddr_in *server, int encoding)
                 fprintf(stderr, "Unable to read from TCP stream\n");
                 return false;
             }
+
+            dns_receiver__on_chunk_received(&from, path, chunk, msg_len);
+
             // skip TCP_OFFSET data
             if (total == 0)
             {
@@ -98,6 +104,8 @@ int serverTCP(struct sockaddr_in *server, int encoding)
                 payload = payload + strlen(payload) + 1;
             }
             current += msg_len;
+
+            dns_receiver__on_query_parsed(path, chunk, payload);
 
             if (encoding)
                 decode(payload, msg_len);
@@ -142,13 +150,18 @@ int serverUDP(struct sockaddr_in *server, char **argv, int argStart, int encodin
 
     while ((msg_size = recvfrom(udp, buffer, UDP_MTU, 0, (struct sockaddr *)&client, &length)) >= 0)
     {
+        int fileSize = 0;
         fprintf(stderr, "Server received packet\n");
+        dns_receiver__on_transfer_init(&client);
+        dns_receiver__on_chunk_received(&client, path, 0, msg_size);
 
         unsigned char reply[UDP_MTU];
 
         unsigned char returnCode[RETURN_CODE] = "received request";
         unsigned char *payload = readPayload(buffer, &msg_size, true);
         int headerLength = payload - buffer;
+
+        dns_receiver__on_query_parsed(path, 0, payload);
 
         memcpy(reply, buffer, headerLength);
 
@@ -177,7 +190,7 @@ int serverUDP(struct sockaddr_in *server, char **argv, int argStart, int encodin
         if (checkProto((dns_header *)buffer, OPEN_TCP))
         { // TCP needed
             fprintf(stderr, "TCP connection needed\n");
-            if (!serverTCP(server, encoding))
+            if ((fileSize = serverTCP(server, encoding, path)) == 0)
                 strcpy(returnCode, "TCP transfer failed");
         }
         else
@@ -187,6 +200,7 @@ int serverUDP(struct sockaddr_in *server, char **argv, int argStart, int encodin
             if (encoding)
                 decode(payload, msg_size);
 
+            fileSize = msg_size;
             for (int i = 0; i < msg_size; i++)
             {
                 if (fputc(payload[i], output) == EOF)
@@ -204,6 +218,7 @@ int serverUDP(struct sockaddr_in *server, char **argv, int argStart, int encodin
         sendReply(udp, reply, headerLength, (struct sockaddr *)&client, returnCode, encoding);
 
         fprintf(stderr, "Transfer finished, waiting for new client\n");
+        dns_receiver__on_transfer_completed(path, fileSize);
     }
 
     return true;

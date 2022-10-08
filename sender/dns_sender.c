@@ -192,7 +192,7 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
                 return false;
             }
 
-            dns_sender__on_chunk_sent(&dest->sin_addr, data->dst_file, chunk, msg_size);
+            dns_sender__on_chunk_sent(&dest->sin_addr, data->dst_file, chunk, length + msg_size);
             return true;
         }
         else if (init)
@@ -201,11 +201,16 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
 
             ((dns_header *)packet)->q_count = htons(2);
 
+            fprintf(stderr, "Sending request to switch to TCP\n");
+            dns_sender__on_chunk_encoded(data->dst_file, chunk, data->host);
+
             if (sendto(fd, packet, length, 0, (const struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0)
             {
                 perror("Failed to send message to require TCP connection\n");
                 return false;
             }
+
+            dns_sender__on_chunk_sent(&dest->sin_addr, data->dst_file, chunk, length);
         }
 
         if (!switchToTCP(fd, (const struct sockaddr *)dest, packet, length))
@@ -236,7 +241,7 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
             perror("unable to write() whole message\n");
             return false;
         }
-        dns_sender__on_chunk_sent(&dest->sin_addr, data->dst_file, chunk, msg_size);
+        dns_sender__on_chunk_sent(&dest->sin_addr, data->dst_file, chunk, length + msg_size + TCP_OFFSET);
 
         max_len = TCP_MTU - length - TCP_OFFSET; // -2 for 2 bytes for lenght of TCP
     }
