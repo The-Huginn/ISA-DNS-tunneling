@@ -47,8 +47,7 @@ int serverTCP(struct sockaddr_in *server, int encoding)
     struct sockaddr_in from;
     int newSock, msg_len;
     socklen_t len = sizeof(from);
-    unsigned char buffer_b[TCP_MTU + TCP_OFFSET];
-    unsigned char *buffer;
+    unsigned char buffer_b[TCP_MTU];
 
     while (true)
     {
@@ -65,6 +64,7 @@ int serverTCP(struct sockaddr_in *server, int encoding)
         while (total != current)
         {
 
+            unsigned char *buffer = buffer_b;
             // reading message
             if ((msg_len = read(newSock, buffer, TCP_MTU)) < 0)
             {
@@ -72,8 +72,11 @@ int serverTCP(struct sockaddr_in *server, int encoding)
                 return false;
             }
             // skip TCP_OFFSET data
-            msg_len -= TCP_OFFSET;
-            buffer += TCP_OFFSET;
+            if (total == 0)
+            {
+                msg_len -= TCP_OFFSET;
+                buffer += TCP_OFFSET;
+            }
 
             int received = msg_len;
 
