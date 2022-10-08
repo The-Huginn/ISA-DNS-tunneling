@@ -249,7 +249,7 @@ int main(int argc, char **argv)
     struct sockaddr_in server;
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = htonl(INADDR_ANY);
-    server.sin_port = htons(5557);
+    server.sin_port = htons(PORT);
 
     signal(SIGINT, my_handler);
 
