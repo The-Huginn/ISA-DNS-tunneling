@@ -7,6 +7,7 @@
 #define __DNSUTILS__
 
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <arpa/inet.h>
 
 #include "dnsHeader.h"

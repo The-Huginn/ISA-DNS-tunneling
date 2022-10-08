@@ -6,9 +6,9 @@
 #define CREATE_IPV4STR(dst, src) char dst[NETADDR_STRLEN]; inet_ntop(AF_INET, src, dst, NETADDR_STRLEN)
 #define CREATE_IPV6STR(dst, src) char dst[NETADDR_STRLEN]; inet_ntop(AF_INET6, src, dst, NETADDR_STRLEN)
 
-void dns_receiver__on_query_parsed(char *filePath, int chunkId, char *encodedData)
+void dns_receiver__on_query_parsed(char *filePath, char *encodedData)
 {
-	fprintf(stderr, "[PARS] %s %9d '%s'\n", filePath, chunkId, encodedData);
+	fprintf(stderr, "[PARS] %s '%s'\n", filePath, encodedData);
 }
 
 void on_chunk_received(char *source, char *filePath, int chunkId, int chunkSize)

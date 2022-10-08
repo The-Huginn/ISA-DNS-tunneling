@@ -2,6 +2,7 @@
 #define ISA22_DNS_SENDER_EVENTS_H
 
 #include <netinet/in.h>
+#include <sys/socket.h>
 
 /**
  * Tato metoda je volána klientem (odesílatelem) při zakódování části dat do doménového jména.

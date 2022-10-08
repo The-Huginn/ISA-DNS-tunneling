@@ -9,14 +9,14 @@ MODULES_SENDER := sender/dns_sender_events sender/utils
 HEADERS_RECEIVER := receiver/dns_receiver_events  receiver/utils
 MODULES_RECEIVER := receiver/dns_receiver_events receiver/utils
 
-SOURCES := $(patsubst %,%.c,$(MODULES))
-OBJS := $(patsubst %,%.o,$(MODULES))
+SOURCES := $(MODULES:%=%.c)
+OBJS := $(MODULES:%=%.o))
 
-SOURCES_SENDER := $(patsubst %,%.c,$(MODULES_SENDER))
-OBJS_SENDER := $(patsubst %,%.o,$(MODULES_SENDER))
+SOURCES_SENDER := $(MODULES_SENDER:%=%.c)
+OBJS_SENDER := $(MODULES_SENDER:%=%.o)
 
-SOURCES_RECEIVER := $(patsubst %,%.c,$(MODULES_RECEIVER))
-OBJS_RECEIVER := $(patsubst %,%.o,$(MODULES_RECEIVER))
+SOURCES_RECEIVER := $(MODULES_RECEIVER:%=%.c)
+OBJS_RECEIVER := $(MODULES_RECEIVER:%=%.o)
 
 all: sender receiver
 
