@@ -73,7 +73,7 @@ int serverTCP(struct sockaddr_in *server, int encoding, unsigned char* path)
                 return false;
             }
 
-            dns_receiver__on_chunk_received(&from, path, chunk, msg_len);
+            dns_receiver__on_chunk_received(&from.sin_addr, path, chunk, msg_len);
 
             // skip TCP_OFFSET data
             if (total == 0)
@@ -110,6 +110,7 @@ int serverTCP(struct sockaddr_in *server, int encoding, unsigned char* path)
             if (encoding)
                 decode(payload, msg_len);
 
+            fileSize += msg_len;
             for (int i = 0; i < msg_len; i++)
             {
                 if (fputc(payload[i], output) == EOF)
@@ -127,11 +128,11 @@ int serverTCP(struct sockaddr_in *server, int encoding, unsigned char* path)
         if (last)
         {
             fprintf(stderr, "Last packet received, listening on UDP again\n");
-            return true;
+            return fileSize;
         }
     }
 
-    return true;
+    return fileSize;
 }
 
 int serverUDP(struct sockaddr_in *server, char **argv, int argStart, int encoding)
@@ -152,8 +153,8 @@ int serverUDP(struct sockaddr_in *server, char **argv, int argStart, int encodin
     {
         int fileSize = 0;
         fprintf(stderr, "Server received packet\n");
-        dns_receiver__on_transfer_init(&client);
-        dns_receiver__on_chunk_received(&client, path, 0, msg_size);
+        dns_receiver__on_transfer_init(&client.sin_addr);
+        dns_receiver__on_chunk_received(&client.sin_addr, path, 0, msg_size);
 
         unsigned char reply[UDP_MTU];
 
@@ -248,7 +249,7 @@ int main(int argc, char **argv)
     struct sockaddr_in server;
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = htonl(INADDR_ANY);
-    server.sin_port = htons(5558);
+    server.sin_port = htons(5557);
 
     signal(SIGINT, my_handler);
 
