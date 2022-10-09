@@ -154,9 +154,17 @@ unsigned char *readPayload(unsigned char *packet, int *msg_size, int first)
     return &packet[length];
 }
 
-int checkProto(dns_header *dns, int proto)
+int checkProto(unsigned char *packet, int proto)
 {
-    return ntohs(dns->q_count) == proto;
+    packet = &packet[HEADER_SIZE];
+    packet = &packet[strlen(packet) + 1];
+
+    question* qinfo = (question*)packet;
+
+    if (proto == OPEN_TCP)
+        return ntohs(qinfo->qtype) == T_NS;
+
+    return ntohs(qinfo->qtype) == T_A; 
 }
 
 int createQuery(unsigned char* packet, unsigned char *host)
@@ -174,6 +182,19 @@ int createQuery(unsigned char* packet, unsigned char *host)
     length += sizeof(question);
 
     return length;
+}
+
+void changeProto(unsigned char* packet, int proto)
+{
+    packet = &packet[HEADER_SIZE];
+    packet = &packet[strlen(packet) + 1];
+
+    question *qinfo = (question*)packet;
+
+    if (proto == OPEN_TCP)
+        qinfo->qtype = ntohs(T_NS);
+    else
+        qinfo->qtype = ntohs(T_A);
 }
 
 int addResource(unsigned char* packet, int length)

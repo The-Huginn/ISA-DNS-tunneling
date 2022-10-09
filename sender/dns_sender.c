@@ -199,7 +199,7 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         { // send one UDP to inform about TCP, still sends name of the file
             init = false;
 
-            ((dns_header *)packet)->q_count = htons(2);
+            changeProto(packet, OPEN_TCP);
 
             fprintf(stderr, "Sending request to switch to TCP\n");
             dns_sender__on_chunk_encoded(data->dst_file, chunk, data->host);
@@ -218,7 +218,7 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
 
         // TCP communication
         if (msg_size != max_len)
-            ((dns_header *)packet)->q_count = htons(1); // last packet
+            changeProto(packet, OPEN_UDP); // last packet
 
         *((uint16_t*)&packet[-TCP_OFFSET]) = ntohs(msg_size + length);   // as RFC 1035 requires
 

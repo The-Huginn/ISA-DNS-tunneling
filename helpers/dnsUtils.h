@@ -39,9 +39,11 @@ unsigned char* readPayload(unsigned char* packet, int *msg_size, int first);
 /**
  * @return true upon proto being the same as q_count
  */
-int checkProto(dns_header* dns, int proto);
+int checkProto(unsigned char *packet, int proto);
 
 int createQuery(unsigned char *packet, unsigned char* host);
+
+void changeProto(unsigned char* packet, int proto);
 
 int addResource(unsigned char* packet, int length);
 

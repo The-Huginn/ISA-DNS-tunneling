@@ -85,7 +85,7 @@ int serverTCP(struct sockaddr_in *server, int encoding, unsigned char* path)
             int received = msg_len;
 
             // last packet received
-            if (checkProto((dns_header *)buffer, OPEN_UDP))
+            if (checkProto(buffer, OPEN_UDP))
                 last = true;
 
             unsigned char *payload = readPayload(buffer, &received, total == 0);
@@ -189,7 +189,7 @@ int serverUDP(struct sockaddr_in *server, char **argv, int argStart, int encodin
         }
 
         // checks if TCP is needed, otherwise writes data here
-        if (checkProto((dns_header *)buffer, OPEN_TCP))
+        if (checkProto(buffer, OPEN_TCP))
         { // TCP needed
             fprintf(stderr, "TCP connection needed\n");
             if ((fileSize = serverTCP(server, encoding, path)) == 0)
