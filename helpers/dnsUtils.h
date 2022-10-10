@@ -15,7 +15,8 @@
 #define true 1
 #define false 0
 #define STRING_SIZE 255
-#define TCP_MTU 64000
+#define TCP_MTU 1024
+#define TCP_LIMIT 64
 #define UDP_MTU 512         // By RFC 1035
 #define HEADER_SIZE sizeof(dns_header)
 #define OPEN_UDP 1
@@ -34,7 +35,7 @@ void initHeader(dns_header *dns);
 
 int sendReply(int fd, unsigned char* packet, int dns_length, struct sockaddr* client, unsigned char* returnCode, int encoding);
 
-unsigned char* readPayload(unsigned char* packet, int *msg_size, int first);
+unsigned char* readPayload(unsigned char* packet, int *msg_size);
 
 /**
  * @return true upon proto being the same as q_count

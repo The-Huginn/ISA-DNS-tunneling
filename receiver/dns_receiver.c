@@ -41,7 +41,7 @@ void my_handler(int s)
     exit(0);
 }
 
-int serverTCP(struct sockaddr_in *server, int encoding, unsigned char* path)
+int serverTCP(struct sockaddr_in *server, int encoding, unsigned char *path)
 {
     struct sockaddr_in from;
     int newSock, msg_len;
@@ -52,18 +52,15 @@ int serverTCP(struct sockaddr_in *server, int encoding, unsigned char* path)
 
     while (true)
     {
-        chunk++;
         if ((newSock = accept(tcp, (struct sockaddr *)&from, &len)) == -1)
         {
             fprintf(stderr, "accept failed\n");
             return false;
         }
 
-        int total = 0;
-        int current = 1; // cant be same as total
         int last = false;
 
-        while (total != current)
+        while (++chunk % (TCP_LIMIT + 1) != 0)
         {
             unsigned char *buffer = buffer_b;
             // reading message
@@ -73,37 +70,19 @@ int serverTCP(struct sockaddr_in *server, int encoding, unsigned char* path)
                 return false;
             }
 
+            if (msg_len != TCP_MTU)
+                fprintf(stderr, "We have a problem\n");
+
             dns_receiver__on_chunk_received(&from.sin_addr, path, chunk, msg_len);
 
-            // skip TCP_OFFSET data
-            if (total == 0)
-            {
-                msg_len -= TCP_OFFSET;
-                buffer += TCP_OFFSET;
-            }
+            msg_len -= TCP_OFFSET;
+            buffer += TCP_OFFSET;
 
-            int received = msg_len;
 
-            // last packet received
-            if (checkProto(buffer, OPEN_UDP))
-                last = true;
+            unsigned char *payload = readPayload(buffer, &msg_len);
 
-            unsigned char *payload = readPayload(buffer, &received, total == 0);
-
-            ptrdiff_t diff = payload - buffer;
-            msg_len = msg_len - diff; // actual size of the payload
-
-            // first packet
-            if (total == 0)
-            {
-                current = 0;
-                total = received;
-
-                // skip file name, which is in the beggining
-                msg_len -= (strlen(payload) + 1);
-                payload = payload + strlen(payload) + 1;
-            }
-            current += msg_len;
+            // skip file name, which is in the beggining
+            payload += strlen(payload) + 1;
 
             dns_receiver__on_query_parsed(path, payload);
 
@@ -119,8 +98,13 @@ int serverTCP(struct sockaddr_in *server, int encoding, unsigned char* path)
                     return false;
                 }
             }
-            fprintf(stderr, "%d:%d\n", total, current);
-            msg_len = payload[msg_len - 1];
+
+            // last packet received
+            if (checkProto(buffer, OPEN_UDP))
+            {
+                last = true;
+                break;
+            }
         }
 
         close(newSock);
@@ -159,7 +143,7 @@ int serverUDP(struct sockaddr_in *server, char **argv, int argStart, int encodin
         unsigned char reply[UDP_MTU];
 
         unsigned char returnCode[RETURN_CODE] = "received request";
-        unsigned char *payload = readPayload(buffer, &msg_size, true);
+        unsigned char *payload = readPayload(buffer, &msg_size);
         int headerLength = payload - buffer;
 
         dns_receiver__on_query_parsed(path, payload);

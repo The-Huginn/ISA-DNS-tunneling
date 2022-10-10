@@ -159,10 +159,10 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         fprintf(stderr, "Listening for replies from server\n");
         while ((msg_size = recvfrom(fd, payload, UDP_MTU, 0, (struct sockaddr *)&from, &len)) >= 0)
         {
-            unsigned char *reply = readPayload(payload, &msg_size, true);
+            unsigned char *reply = readPayload(payload, &msg_size);
             if (data->encode)
                 decode(reply, msg_size);
-                
+
             fprintf(stderr, "Reply from the server: %s\n", reply);
         }
     }
@@ -213,18 +213,23 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
             dns_sender__on_chunk_sent(&dest->sin_addr, data->dst_file, chunk, length);
         }
 
-        if (!switchToTCP(fd, (const struct sockaddr *)dest, packet, length))
-            return false;
+        // Open new TCP socket
+        if (chunk % TCP_LIMIT == 0)
+        {
+            if (!switchToTCP(fd, (const struct sockaddr *)dest, packet, length))
+                return false;
+        }
 
         // TCP communication
         if (msg_size != max_len)
             changeProto(packet, OPEN_UDP); // last packet
 
-        *((uint16_t*)&packet[-TCP_OFFSET]) = ntohs(msg_size + length);   // as RFC 1035 requires
+        usleep(10000);
+        *((uint16_t *)&packet[-TCP_OFFSET]) = ntohs(msg_size + length); // as RFC 1035 requires
 
         appendMessage(packet, headerLength, payload, length - headerLength, msg_size);
         if (data->encode)
-                encode(&packet[length], msg_size);
+            encode(&packet[length], msg_size);
 
         dns_sender__on_chunk_encoded(data->dst_file, chunk, data->host);
 
@@ -242,9 +247,9 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
             return false;
         }
         dns_sender__on_chunk_sent(&dest->sin_addr, data->dst_file, chunk, length + msg_size + TCP_OFFSET);
-        sleep(1);
 
-        max_len = TCP_MTU - length - TCP_OFFSET; // -2 for 2 bytes for lenght of TCP
+
+        max_len = TCP_MTU - length - TCP_OFFSET;
     }
 
     dns_sender__on_transfer_completed(data->dst_file, totalSize);
@@ -260,8 +265,8 @@ int main(int argc, char *argv[])
 
     // Initialization
     data_cache data;
-    unsigned char packet_b[TCP_MTU]; // for UDP communication only UDP_MTU should be used
-    unsigned char* packet = &packet_b[TCP_OFFSET];    // for TCP communication 2 bytes
+    unsigned char packet_b[TCP_MTU];               // for UDP communication only UDP_MTU should be used
+    unsigned char *packet = &packet_b[TCP_OFFSET]; // for TCP communication 2 bytes
     int ret = 0;
     struct sockaddr_in dest;
 
@@ -298,7 +303,7 @@ int main(int argc, char *argv[])
         ret = -1;
 
     // Closing resources
-    sleep(1); //sleep for 1s
+    sleep(1); // sleep for 1s
     if (child != 0)
         kill(child, SIGKILL);
 

@@ -133,11 +133,8 @@ int sendReply(int fd, unsigned char* packet, int dns_length, struct sockaddr* cl
     return true;
 }
 
-unsigned char *readPayload(unsigned char *packet, int *msg_size, int first)
+unsigned char *readPayload(unsigned char *packet, int *msg_size)
 {
-    if (first == false)
-        return packet;
-
     unsigned char* qname = &packet[HEADER_SIZE];
     int length = HEADER_SIZE;
     length += strlen(qname) + 1;
