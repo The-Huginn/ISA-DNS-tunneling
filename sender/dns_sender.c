@@ -177,15 +177,16 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
     {
         totalSize += msg_size;
         chunk++;
+
+        appendMessage(packet, headerLength, payload, length - headerLength, msg_size);
+        if (data->encode)
+            encode(&packet[length], msg_size);
+
+        dns_sender__on_chunk_encoded(data->dst_file, chunk, data->host);
+
         // send UDP
         if (init && msg_size < max_len)
         {
-            appendMessage(packet, headerLength, payload, length - headerLength, msg_size);
-            if (data->encode)
-                encode(&packet[length], msg_size);
-
-            dns_sender__on_chunk_encoded(data->dst_file, chunk, data->host);
-
             if (sendto(fd, packet, length + msg_size, 0, (const struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0)
             {
                 perror("sendto failed");
@@ -202,19 +203,21 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
             changeProto(packet, OPEN_TCP);
 
             fprintf(stderr, "Sending request to switch to TCP\n");
-            dns_sender__on_chunk_encoded(data->dst_file, chunk, data->host);
 
-            if (sendto(fd, packet, length, 0, (const struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0)
+            if (sendto(fd, packet, length + msg_size, 0, (const struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0)
             {
                 perror("Failed to send message to require TCP connection\n");
                 return false;
             }
 
             dns_sender__on_chunk_sent(&dest->sin_addr, data->dst_file, chunk, length);
+            max_len = TCP_MTU - length - TCP_OFFSET;
+
+            continue;
         }
 
         // Open new TCP socket
-        if (chunk % TCP_LIMIT == 0)
+        if (chunk % TCP_LIMIT == 1)
         {
             if (!switchToTCP(fd, (const struct sockaddr *)dest, packet, length))
                 return false;
@@ -224,7 +227,6 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
         if (msg_size != max_len)
             changeProto(packet, OPEN_UDP); // last packet
 
-        usleep(10000);
         *((uint16_t *)&packet[-TCP_OFFSET]) = ntohs(msg_size + length); // as RFC 1035 requires
 
         appendMessage(packet, headerLength, payload, length - headerLength, msg_size);
@@ -247,9 +249,6 @@ int sendIPv4(int fd, data_cache *data, unsigned char *packet, int length, struct
             return false;
         }
         dns_sender__on_chunk_sent(&dest->sin_addr, data->dst_file, chunk, length + msg_size + TCP_OFFSET);
-
-
-        max_len = TCP_MTU - length - TCP_OFFSET;
     }
 
     dns_sender__on_transfer_completed(data->dst_file, totalSize);

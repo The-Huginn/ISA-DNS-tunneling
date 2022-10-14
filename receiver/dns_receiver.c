@@ -63,23 +63,29 @@ int serverTCP(struct sockaddr_in *server, int encoding, unsigned char *path)
         while (++chunk % (TCP_LIMIT + 1) != 0)
         {
             unsigned char *buffer = buffer_b;
-            // reading message
-            if ((msg_len = read(newSock, buffer, TCP_MTU)) < 0)
+
+            // reading message in TCP_MTU's or until end of communication
+            int total = 0;
+            while (total != TCP_MTU && !last)
             {
-                fprintf(stderr, "Unable to read from TCP stream\n");
-                return false;
+                if ((msg_len = read(newSock, &buffer[total], TCP_MTU - total)) < 0)
+                {
+                    fprintf(stderr, "Unable to read from TCP stream\n");
+                    return false;
+                }
+
+                total += msg_len;
+                // last packet received
+                if (checkProto(&buffer[TCP_OFFSET], OPEN_UDP))
+                    last = true;
             }
 
-            if (msg_len != TCP_MTU)
-                fprintf(stderr, "We have a problem\n");
+            dns_receiver__on_chunk_received(&from.sin_addr, path, chunk, total);
 
-            dns_receiver__on_chunk_received(&from.sin_addr, path, chunk, msg_len);
-
-            msg_len -= TCP_OFFSET;
+            total -= TCP_OFFSET;
             buffer += TCP_OFFSET;
 
-
-            unsigned char *payload = readPayload(buffer, &msg_len);
+            unsigned char *payload = readPayload(buffer, &total);
 
             // skip file name, which is in the beggining
             payload += strlen(payload) + 1;
@@ -87,10 +93,10 @@ int serverTCP(struct sockaddr_in *server, int encoding, unsigned char *path)
             dns_receiver__on_query_parsed(path, payload);
 
             if (encoding)
-                decode(payload, msg_len);
+                decode(payload, total);
 
-            fileSize += msg_len;
-            for (int i = 0; i < msg_len; i++)
+            fileSize += total;
+            for (int i = 0; i < total; i++)
             {
                 if (fputc(payload[i], output) == EOF)
                 {
@@ -98,13 +104,8 @@ int serverTCP(struct sockaddr_in *server, int encoding, unsigned char *path)
                     return false;
                 }
             }
-
-            // last packet received
-            if (checkProto(buffer, OPEN_UDP))
-            {
-                last = true;
+            if (last)
                 break;
-            }
         }
 
         close(newSock);
@@ -172,29 +173,31 @@ int serverUDP(struct sockaddr_in *server, char **argv, int argStart, int encodin
             continue;
         }
 
+        if (encoding)
+            decode(payload, msg_size);
+
+        fileSize = msg_size;
+        for (int i = 0; i < msg_size; i++)
+        {
+            if (fputc(payload[i], output) == EOF)
+            {
+                fprintf(stderr, "Problem writing into file\n");
+                strcpy(returnCode, "unable to write to file");
+            }
+        }
+
         // checks if TCP is needed, otherwise writes data here
         if (checkProto(buffer, OPEN_TCP))
         { // TCP needed
             fprintf(stderr, "TCP connection needed\n");
             if ((fileSize = serverTCP(server, encoding, path)) == 0)
                 strcpy(returnCode, "TCP transfer failed");
+
+            fileSize += msg_size;   // data from UDP communication
         }
         else
         { // all payload in current UDP packet
             fprintf(stderr, "UDP connection sufficient\n");
-
-            if (encoding)
-                decode(payload, msg_size);
-
-            fileSize = msg_size;
-            for (int i = 0; i < msg_size; i++)
-            {
-                if (fputc(payload[i], output) == EOF)
-                {
-                    fprintf(stderr, "Problem writing into file\n");
-                    strcpy(returnCode, "unable to write to file");
-                }
-            }
         }
 
         fclose(output);

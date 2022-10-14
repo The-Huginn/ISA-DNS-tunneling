@@ -72,6 +72,6 @@ typedef struct
 
 #define IN 1        // Class
 
-#define PORT 5556             // DNS port
+#define PORT 53             // DNS port
 
 #endif // !__DNSHEADER__
