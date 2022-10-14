@@ -10,7 +10,7 @@
             "request": "launch",
             "preLaunchTask": "DNS sender build",
             "program": "${workspaceFolder}/sender/dns_sender",
-            "args": ["-b", "vut.cz", "-u", "8.8.8.8", "./ahoj.txt", "<./short.log"],
+            "args": ["-b", "example.com", "-u", "147.229.176.14", "ahoj.txt", "<./short.log"], //147.229.176.14
             // "args": ["-b", "vutbr.cz", "./ahoj.txt"],
             "stopAtEntry": true,
             "cwd": "${workspaceFolder}",

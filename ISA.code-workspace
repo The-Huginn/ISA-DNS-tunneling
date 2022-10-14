@@ -1,0 +1,24 @@
+{
+	"folders": [
+		{
+			"path": "../ipk"
+		},
+		{
+			"path": "../src"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"inet.h": "c",
+			"utils.h": "c",
+			"in.h": "c",
+			"dns_receiver.h": "c",
+			"unistd.h": "c",
+			"stdlib.h": "c",
+			"types.h": "c"
+		}
+	}
+}
